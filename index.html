@@ -1,0 +1,2447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Workfloor — Team tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/SheetJS/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg: #F7F6F2;
+    --surface: #FFFFFF;
+    --border: #E3E0D8;
+    --ink: #2B2A27;
+    --ink-soft: #80796E;
+    --accent: #5C7A5E;
+    --accent-soft: #E7EEE3;
+    --accent-deep: #3E5640;
+    --warn: #B5763B;
+    --warn-soft: #FBEFE2;
+    --danger: #B2483F;
+    --danger-soft: #FBE9E6;
+    --blue: #3A5A9C;
+    --blue-soft: #EDF1FB;
+    --grey-soft: #EEEEEC;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ font-family:var(--font); background:var(--bg); color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased; }
+
+  header.topbar{
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:14px 24px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:50; flex-wrap:wrap; gap:10px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .mark{ width:30px; height:30px; border-radius:8px; background:var(--accent); display:flex; align-items:center; justify-content:center; color:white; font-weight:600; font-size:14px; }
+  .brand .name{ font-weight:600; font-size:16px; letter-spacing:-0.01em; }
+  .top-right{ display:flex; align-items:center; gap:14px; }
+
+  button{ font-family:var(--font); cursor:pointer; }
+  .btn{ border:1px solid var(--border); background:var(--surface); border-radius:8px; padding:8px 14px; font-size:13px; font-weight:500; color:var(--ink); display:inline-flex; align-items:center; gap:6px; transition:all .12s ease; }
+  .btn:hover{ background:var(--bg); }
+  .btn:active{ transform:scale(0.98); }
+  .btn-accent{ background:var(--accent); color:white; border-color:var(--accent); }
+  .btn-accent:hover{ background:var(--accent-deep); }
+  .btn-danger{ color:var(--danger); }
+  .btn-sm{ padding:5px 10px; font-size:12px; }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  main{ max-width:1160px; margin:0 auto; padding:28px 24px 60px; }
+  .page-head{ margin-bottom:22px; }
+  .page-head h1{ font-size:22px; font-weight:600; margin:0 0 4px; letter-spacing:-0.01em; }
+  .page-head p{ margin:0; color:var(--ink-soft); font-size:14px; }
+
+  .grid{ display:grid; gap:14px; }
+  .grid-2{ grid-template-columns:repeat(2,1fr); }
+  .grid-3{ grid-template-columns:repeat(3,1fr); }
+  .grid-4{ grid-template-columns:repeat(4,1fr); }
+  @media(max-width:720px){ .grid-2,.grid-3,.grid-4{ grid-template-columns:repeat(2,1fr); } main{ padding:20px 16px 50px; } header.topbar{ padding:12px 16px; } }
+  @media(max-width:520px){ .grid-2{ grid-template-columns:1fr; } }
+
+  .stat{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
+  .stat .label{ font-size:12.5px; color:var(--ink-soft); margin:0 0 6px; font-weight:500; }
+  .stat .value{ font-size:24px; font-weight:600; margin:0; letter-spacing:-0.01em; }
+  .stat .sub{ font-size:12px; color:var(--ink-soft); margin-top:4px; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px 22px; margin-top:16px; }
+  .card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap; }
+  .card-head h2{ font-size:16px; font-weight:600; margin:0; }
+  .card-head .hint{ font-size:12.5px; color:var(--ink-soft); }
+  .subhead{ font-size:13px; font-weight:600; margin:0 0 10px; color:var(--ink); }
+
+  .task-block{ border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+  .task-block:last-child{ margin-bottom:0; }
+  .task-block.done{ background:var(--accent-soft); border-color:#c8dfc8; }
+  .task-block.running{ background:#fffbf2; border-color:#e8d5a0; }
+
+  .task-block-head{ display:flex; align-items:center; gap:10px; }
+  .task-block-head input[type=checkbox]{ width:18px; height:18px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+  .task-block-name{ flex:1; font-size:14px; font-weight:500; }
+  .task-block.done .task-block-name{ text-decoration:line-through; color:var(--ink-soft); }
+
+  .task-meta{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .task-meta-item{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); }
+  .task-meta-item strong{ color:var(--ink); }
+
+  .task-actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+
+  .badge{ font-size:11.5px; font-weight:500; padding:3px 9px; border-radius:999px; display:inline-block; }
+  .badge-active{ background:var(--accent-soft); color:var(--accent-deep); }
+  .badge-done{ background:#EDF1FB; color:#3A5A9C; }
+  .badge-absent{ background:var(--danger-soft); color:var(--danger); }
+  .badge-running{ background:var(--warn-soft); color:var(--warn); }
+
+  input[type=text],input[type=number],input[type=time],input[type=password],input[type=date],input[type=email],select.field{
+    font-family:var(--font); border:1px solid var(--border); border-radius:8px;
+    padding:8px 10px; font-size:13px; background:var(--surface); color:var(--ink);
+  }
+  input:focus, select.field:focus{ outline:2px solid var(--accent-soft); border-color:var(--accent); }
+
+  .inline-form{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .inline-form input[type=text],.inline-form input[type=email]{ flex:1; min-width:160px; }
+
+  .table-wrap{ overflow-x:auto; }
+  table.data{ width:100%; border-collapse:collapse; font-size:13px; min-width:780px; }
+  table.data th{ text-align:left; padding:10px 8px; color:var(--ink-soft); font-weight:500; border-bottom:1px solid var(--border); white-space:nowrap; font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
+  table.data td{ padding:10px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.data tbody tr:last-child td{ border-bottom:none; }
+  table.data tbody tr:hover{ background:var(--bg); }
+
+  .name-cell{ display:flex; align-items:center; gap:10px; font-weight:500; }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent-deep); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; }
+
+  .foot-note{ margin-top:28px; font-size:12px; color:var(--ink-soft); text-align:center; }
+  .hidden{ display:none !important; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(43,42,39,0.35); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; overflow-y:auto; }
+  .modal{ background:var(--surface); border-radius:var(--radius-lg); padding:22px 24px; width:100%; max-width:400px; border:1px solid var(--border); max-height:88vh; overflow-y:auto; }
+  .modal h3{ margin:0 0 14px; font-size:16px; font-weight:600; }
+  .modal label{ display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px; margin-top:12px; }
+  .modal input,.modal select{ width:100%; }
+  .modal .modal-actions{ display:flex; gap:8px; margin-top:18px; justify-content:flex-end; }
+  .modal .error{ color:var(--danger); font-size:12.5px; margin-top:8px; min-height:16px; }
+  .modal .field-row{ display:flex; gap:10px; }
+  .modal .field-row > div{ flex:1; }
+
+  #loginScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:30px 28px; width:100%; max-width:360px; }
+  .login-card .mark{ width:38px; height:38px; border-radius:10px; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:17px; margin-bottom:14px; }
+  .login-card h2{ margin:0 0 4px; font-size:19px; font-weight:600; }
+  .login-card p.sub{ margin:0 0 18px; font-size:13px; color:var(--ink-soft); }
+  .login-card label{ display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px; margin-top:14px; }
+  .login-card input{ width:100%; }
+  .login-card .error{ color:var(--danger); font-size:12.5px; margin-top:10px; min-height:16px; }
+  .login-card button{ width:100%; margin-top:18px; padding:10px; font-size:14px; }
+  .login-card .switch-link{ text-align:center; margin-top:14px; font-size:12.5px; color:var(--ink-soft); }
+  .login-card .switch-link a{ color:var(--accent-deep); cursor:pointer; text-decoration:underline; }
+
+  .duration-pill{ background:var(--warn-soft); color:var(--warn); font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; }
+  .duration-pill.done{ background:var(--accent-soft); color:var(--accent-deep); }
+
+  .doc-row{ display:flex; align-items:center; gap:12px; border:1px solid var(--border); border-radius:10px; padding:11px 14px; margin-bottom:8px; }
+  .doc-row:last-child{ margin-bottom:0; }
+  .doc-icon{ width:34px; height:34px; border-radius:8px; background:var(--danger-soft); color:var(--danger); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0; }
+  .doc-info{ flex:1; min-width:0; }
+  .doc-name{ font-size:13.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .doc-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .doc-actions{ display:flex; gap:6px; flex-shrink:0; }
+
+  .guide-row{ display:flex; align-items:center; gap:12px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px; }
+  .guide-row:last-child{ margin-bottom:0; }
+  .guide-icon{ width:34px; height:34px; border-radius:8px; background:var(--blue-soft); color:var(--blue); display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .guide-info{ flex:1; min-width:0; }
+  .guide-title{ font-size:13.5px; font-weight:500; }
+  .guide-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .guide-actions{ display:flex; gap:6px; flex-shrink:0; }
+
+  .step-progress{ display:flex; gap:5px; margin:4px 0 18px; }
+  .step-progress .dot{ flex:1; height:5px; border-radius:3px; background:var(--grey-soft); }
+  .step-progress .dot.active{ background:var(--accent); }
+  .step-progress .dot.past{ background:var(--accent-soft); }
+  .step-view-title{ font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent-deep); margin-bottom:6px; }
+  .step-view-body{ font-size:14px; line-height:1.6; color:var(--ink); white-space:pre-wrap; }
+  .step-counter{ font-size:12px; color:var(--ink-soft); margin-top:4px; }
+
+  .guide-edit-step{ border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  .guide-edit-step:last-child{ margin-bottom:0; }
+  .guide-edit-step .gstep-title{ font-size:13px; font-weight:600; }
+  .guide-edit-step .gstep-body{ font-size:12.5px; color:var(--ink-soft); margin-top:3px; white-space:pre-wrap; }
+  .guide-edit-step .gstep-actions{ display:flex; gap:6px; margin-top:8px; }
+
+  .cal-head-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .cal-nav{ display:flex; align-items:center; gap:8px; }
+  .cal-month-label{ font-size:14px; font-weight:600; min-width:140px; text-align:center; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal-dow{ font-size:11px; font-weight:600; color:var(--ink-soft); text-align:center; padding-bottom:2px; text-transform:uppercase; }
+  .cal-cell{ aspect-ratio:1/0.85; border:1px solid var(--border); border-radius:8px; padding:6px; font-size:12px; position:relative; cursor:default; display:flex; flex-direction:column; }
+  .cal-cell.empty{ border:none; }
+  .cal-cell.clickable{ cursor:pointer; }
+  .cal-cell.clickable:hover{ border-color:var(--accent); }
+  .cal-cell .cal-num{ font-weight:600; font-size:12px; }
+  .cal-cell .cal-status-label{ font-size:9.5px; margin-top:auto; font-weight:600; padding:1px 4px; border-radius:4px; align-self:flex-start; }
+  .cal-cell.today{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .st-present{ background:var(--accent-soft); }
+  .st-present .cal-status-label{ background:var(--accent); color:white; }
+  .st-absent{ background:var(--danger-soft); }
+  .st-absent .cal-status-label{ background:var(--danger); color:white; }
+  .st-leave{ background:var(--warn-soft); }
+  .st-leave .cal-status-label{ background:var(--warn); color:white; }
+  .st-half{ background:var(--blue-soft); }
+  .st-half .cal-status-label{ background:var(--blue); color:white; }
+  .st-holiday{ background:var(--grey-soft); }
+  .st-holiday .cal-status-label{ background:#9a978f; color:white; }
+  .cal-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:11.5px; color:var(--ink-soft); }
+  .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .cal-legend .sw{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+  .week-row{ display:grid; grid-template-columns:90px 1fr; gap:10px; align-items:center; border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:6px; }
+  .week-row:last-child{ margin-bottom:0; }
+  .week-row.today{ border-color:var(--accent); background:var(--accent-soft); }
+  .week-day-label{ font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+  .week-row.today .week-day-label{ color:var(--accent-deep); }
+  .week-task-text{ font-size:13px; }
+  .week-task-text.empty{ color:var(--ink-soft); font-style:italic; }
+  .week-edit-input{ width:100%; }
+
+  .admin-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:6px; }
+  .admin-row:last-child{ margin-bottom:0; }
+  .admin-row .you-badge{ font-size:11px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 8px; border-radius:999px; margin-left:8px; }
+  .checkbox-list{ display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+  .checkbox-list label{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin:0; font-weight:400; }
+  .checkbox-list input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); }
+  .success-msg{ color:var(--accent-deep); font-size:12.5px; margin-top:8px; min-height:16px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="mark">W</div>
+    <h2 id="loginTitle">Sign in</h2>
+    <p class="sub" id="loginSub">Enter your username and password to continue.</p>
+    <label>Username</label>
+    <input type="text" id="loginUsername" autocomplete="username" />
+    <label>Password</label>
+    <input type="password" id="loginPassword" autocomplete="current-password" />
+    <div class="error" id="loginError"></div>
+    <button class="btn btn-accent" id="btnDoLogin">Sign in</button>
+    <div class="switch-link">
+      Manager? <a id="goManagerLogin">Sign in as manager</a>
+      <span id="empLoginLink"> · Employee? <a id="goEmployeeLogin">Sign in as employee</a></span>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appRoot" class="hidden">
+<header class="topbar">
+  <div class="brand"><div class="mark">W</div><div class="name">Workfloor</div></div>
+  <div class="top-right">
+    <span id="whoami" style="font-size:13px;color:var(--ink-soft);"></span>
+    <span id="sheetsSyncStatus" class="hidden" style="font-size:12px;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-weight:500;"></span>
+    <button class="btn btn-sm" id="btnSyncNow" style="display:none;" title="Sync to Google Sheets">↑ Sync</button>
+    <button class="btn btn-sm" id="btnLogoutApp">Sign out</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- EMPLOYEE VIEW -->
+  <section id="employeeView" class="hidden">
+    <div class="page-head">
+      <h1 id="empGreeting">Hi there</h1>
+      <p id="empDate"></p>
+    </div>
+    <div class="grid grid-3">
+      <div class="stat"><p class="label">Login time</p><p class="value" id="empLoginTime">—</p><p class="sub" id="empLoginSub">Not logged in yet</p></div>
+      <div class="stat"><p class="label">Logout time</p><p class="value" id="empLogoutTime">—</p><p class="sub" id="empLogoutSub">Still working</p></div>
+      <div class="stat"><p class="label">Total count today</p><p class="value" id="empUnits">0</p><p class="sub">Sum of all task counts</p></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+      <button class="btn btn-accent" id="btnLogin">Log in</button>
+      <button class="btn" id="btnLogout">Log out</button>
+      <button class="btn" id="btnEditMyTimes">✎ Edit my times</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>🗓 This week's schedule</h2><span class="hint">Set by your manager — don't miss your due tasks</span></div>
+      <div id="empWeekSchedule"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Today's tasks</h2><span class="hint" id="taskProgress"></span></div>
+      <div id="empTaskList"></div>
+      <p id="empNoTasks" class="hint hidden" style="margin-top:8px;">No tasks assigned for today yet.</p>
+    </div>
+
+    <div class="card">
+      <div class="cal-head-row">
+        <h2 style="font-size:16px;font-weight:600;margin:0;">📅 My attendance</h2>
+        <div class="cal-nav">
+          <button class="btn btn-sm" id="empCalPrev">‹</button>
+          <span class="cal-month-label" id="empCalLabel"></span>
+          <button class="btn btn-sm" id="empCalNext">›</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="empCalGrid"></div>
+      <div class="cal-legend">
+        <span><span class="sw" style="background:var(--accent);"></span> Present</span>
+        <span><span class="sw" style="background:var(--danger);"></span> Absent</span>
+        <span><span class="sw" style="background:var(--warn);"></span> Leave</span>
+        <span><span class="sw" style="background:var(--blue);"></span> Half day</span>
+        <span><span class="sw" style="background:#9a978f;"></span> Holiday</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>📁 Documents</h2><span class="hint">View only — shared by your manager</span></div>
+      <div id="empDocList"></div>
+      <p id="empNoDocs" class="hint hidden" style="margin-top:8px;">No documents have been shared yet.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>📚 Training guides</h2><span class="hint">Tap a scenario for step-by-step help on a call</span></div>
+      <div id="empGuideList"></div>
+      <p id="empNoGuides" class="hint hidden" style="margin-top:8px;">No training guides yet.</p>
+    </div>
+  </section>
+
+  <!-- MANAGER VIEW -->
+  <section id="managerView" class="hidden">
+    <div class="page-head"><h1>Team overview</h1><p id="mgrDate"></p></div>
+    <div class="grid grid-4">
+      <div class="stat"><p class="label">Team members</p><p class="value" id="statHeadcount">0</p></div>
+      <div class="stat"><p class="label">Logged in today</p><p class="value" id="statPresent">0</p></div>
+      <div class="stat"><p class="label">Total count today</p><p class="value" id="statUnits">0</p></div>
+      <div class="stat"><p class="label">Tasks completed</p><p class="value" id="statTasks">0 / 0</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Today's attendance &amp; production</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="btnAddEmployee">+ Add employee</button>
+          <button class="btn btn-accent" id="btnExport">Download Excel</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data" id="mgrTable">
+          <thead><tr><th>Employee</th><th>Login</th><th>Logout</th><th>Total count</th><th>Tasks done</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Assign a task</h2><span class="hint">Employee starts, stops, and records a count per task</span></div>
+      <div class="inline-form">
+        <select class="field" id="taskAssignee"></select>
+        <input type="text" id="newTaskName" placeholder="Task name, e.g. Eligibility / AR Calling" />
+        <button class="btn btn-accent" id="btnAssignTask">Add task</button>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+        <p style="font-size:13px;font-weight:500;margin:0 0 10px;">Add a subtask to an existing task</p>
+        <div class="inline-form" style="margin-top:0;">
+          <select class="field" id="subtaskAssignee"></select>
+          <select class="field" id="subtaskParent"><option value="">— select task —</option></select>
+          <input type="text" id="newSubtaskName" placeholder="Subtask name, e.g. Follow-up call" />
+          <button class="btn" id="btnAssignSubtask">Add subtask</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>🗓 Weekly schedule</h2><span class="hint">Plan what each employee must do on which day so nothing is missed</span></div>
+      <div class="inline-form" style="margin-top:0;">
+        <select class="field" id="weekScheduleEmp" style="flex:1;min-width:180px;"></select>
+      </div>
+      <div id="mgrWeekSchedule" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="cal-head-row">
+        <h2 style="font-size:16px;font-weight:600;margin:0;">📅 Attendance calendar</h2>
+        <div class="cal-nav">
+          <select class="field" id="mgrCalEmp" style="margin-right:8px;"></select>
+          <button class="btn btn-sm" id="mgrCalPrev">‹</button>
+          <span class="cal-month-label" id="mgrCalLabel"></span>
+          <button class="btn btn-sm" id="mgrCalNext">›</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="mgrCalGrid"></div>
+      <div class="cal-legend">
+        <span><span class="sw" style="background:var(--accent);"></span> Present</span>
+        <span><span class="sw" style="background:var(--danger);"></span> Absent</span>
+        <span><span class="sw" style="background:var(--warn);"></span> Leave</span>
+        <span><span class="sw" style="background:var(--blue);"></span> Half day</span>
+        <span><span class="sw" style="background:#9a978f;"></span> Holiday</span>
+        <span style="color:var(--ink-soft);">Click any day to set status &amp; add an update note</span>
+      </div>
+      <div class="inline-form" style="border-top:1px solid var(--border);padding-top:14px;">
+        <div><label style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;">From</label><input type="date" id="attendRangeStart" /></div>
+        <div><label style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;">To</label><input type="date" id="attendRangeEnd" /></div>
+        <button class="btn btn-accent" id="btnExportAttendance" style="align-self:flex-end;">Download attendance (Excel)</button>
+      </div>
+      <p class="error" id="attendExportError" style="margin-top:6px;"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Employee accounts</h2></div>
+      <div class="table-wrap">
+        <table class="data" id="credsTable">
+          <thead><tr><th>Employee</th><th>Username</th><th>Password</th><th>Email</th><th></th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>History &amp; daily log</h2><span class="hint">All recorded days — includes task start/end times and durations</span></div>
+      <div class="table-wrap">
+        <table class="data" id="historyTable">
+          <thead><tr><th>Date</th><th>Employee</th><th>Login</th><th>Logout</th><th>Total count</th><th>Task breakdown</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>📁 Documents folder</h2>
+        <span class="hint">Upload PDFs for employees to view (read-only, no edits)</span>
+      </div>
+      <div class="inline-form">
+        <input type="file" id="pdfUploadInput" accept="application/pdf" style="flex:1;min-width:200px;" />
+        <button class="btn btn-accent" id="btnUploadPdf">Upload PDF</button>
+      </div>
+      <p class="error" id="pdfUploadError" style="margin-top:6px;"></p>
+      <div id="mgrDocList" style="margin-top:14px;"></div>
+      <p id="mgrNoDocs" class="hint hidden" style="margin-top:8px;">No documents uploaded yet.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>📚 Training guides</h2><span class="hint">Build step-by-step scenarios employees follow during calls — only you can edit these</span></div>
+      <div class="inline-form" style="margin-top:0;">
+        <input type="text" id="newGuideTitle" placeholder="New scenario name, e.g. Medical Records Denial" />
+        <button class="btn btn-accent" id="btnAddGuide">Create scenario</button>
+      </div>
+      <div id="mgrGuideList" style="margin-top:14px;"></div>
+      <p id="mgrNoGuides" class="hint hidden" style="margin-top:8px;">No training scenarios yet.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>🔐 Account &amp; admins</h2><span class="hint">Each admin can only change their own login — not anyone else's</span></div>
+      <div class="grid grid-2">
+        <div>
+          <p class="subhead">Your account: <span id="curAdminUsername" style="color:var(--accent-deep);"></span></p>
+          <label>New username (optional)</label>
+          <input type="text" id="acctNewUsername" placeholder="Leave blank to keep current" />
+          <label>New password (optional)</label>
+          <input type="password" id="acctNewPassword" placeholder="Leave blank to keep current" />
+          <label>Current password (required to confirm)</label>
+          <input type="password" id="acctCurrentPassword" placeholder="Enter your current password" />
+          <div class="error" id="acctError"></div>
+          <div class="success-msg" id="acctSuccess"></div>
+          <button class="btn btn-accent btn-sm" id="btnSaveAccount" style="margin-top:10px;">Save my changes</button>
+        </div>
+        <div>
+          <p class="subhead">Admins with access</p>
+          <div id="adminList"></div>
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+            <p class="subhead" style="margin-bottom:8px;">Add a new admin</p>
+            <input type="text" id="newAdminUsername" placeholder="New admin username" style="margin-bottom:8px;" />
+            <input type="password" id="newAdminPassword" placeholder="Set a password" style="margin-bottom:8px;" />
+            <div class="error" id="newAdminError"></div>
+            <button class="btn btn-sm" id="btnAddAdmin">+ Create admin</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="sheetsCard">
+      <div class="card-head">
+        <h2>🔗 Google Sheets sync</h2>
+        <span class="hint">Push live employee data to a Google Sheet automatically</span>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;line-height:1.7;">
+        This uses a <strong>Google Apps Script Web App</strong> that you deploy once — it acts as the bridge between Workfloor and your Google Sheet. No API keys or OAuth needed.
+      </p>
+
+      <div id="sheetsSetupPanel">
+        <p class="subhead">Step 1 — Create a Google Sheet</p>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">Open <a href="https://sheets.google.com" target="_blank" style="color:var(--accent-deep);">Google Sheets</a>, create a new spreadsheet and name it <strong>Workfloor Tracker</strong>.</p>
+
+        <p class="subhead">Step 2 — Add the Apps Script</p>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 4px;">In your sheet, go to <strong>Extensions → Apps Script</strong>. <strong style="color:var(--danger);">Select ALL existing code (Ctrl+A) and DELETE it completely</strong>, then paste this fresh:</p>
+        <div style="background:var(--warn-soft);border:1px solid #e8d5a0;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;color:var(--warn);">
+          ⚠️ <strong>Important:</strong> The script must only contain <code>doGet</code> — NOT <code>doPost</code>. If you see <code>doPost</code> anywhere, delete it. That is what causes the "could not save" error.
+        </div>
+        <div style="position:relative;">
+          <pre id="appsScriptCode" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:11.5px;overflow-x:auto;line-height:1.6;margin:0 0 8px;max-height:220px;overflow-y:auto;">const SHEET_NAME = "Daily Records";
+const ATTENDANCE_SHEET = "Attendance";
+const EMPLOYEES_SHEET = "Employees";
+
+// IMPORTANT: This uses doGet (not doPost) to avoid CORS issues
+function doGet(e) {
+  try {
+    const action = e.parameter.action;
+
+    if (action === "ping") {
+      return jsonResponse({ok: true, status: "Workfloor bridge ready"});
+    }
+
+    if (action === "syncAll") {
+      const payload = JSON.parse(decodeURIComponent(e.parameter.data));
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      syncDailyRecords(ss, payload.days, payload.employees);
+      syncAttendance(ss, payload.attendance, payload.employees);
+      syncEmployees(ss, payload.employees);
+      return jsonResponse({ok: true, message: "Synced " + new Date().toLocaleString()});
+    }
+
+    return jsonResponse({ok: false, error: "Unknown action: " + action});
+  } catch(err) {
+    return jsonResponse({ok: false, error: err.toString()});
+  }
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function syncDailyRecords(ss, days, employees) {
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+  sheet.clearContents();
+  const headers = ["Date","Employee","Login","Logout","Total Count","Task Type","Parent Task","Task","Task Start","Task End","Duration (min)","Duration","Count","Done"];
+  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");
+  const rows = [];
+  Object.keys(days).sort().forEach(date => {
+    employees.forEach(emp => {
+      const day = days[date] && days[date][emp.id];
+      if (!day) return;
+      const total = day.tasks.filter(t => !t.parentId).reduce((s,t)=>s+(parseInt(t.count)||0),0);
+      if (day.tasks.length === 0) {
+        rows.push([date,emp.name,day.login||"",day.logout||"",total,"","","","","","","","",""]);
+      } else {
+        day.tasks.forEach(t => {
+          const durMin = t.duration != null ? t.duration : "";
+          const durHM = t.duration != null ? Math.floor(t.duration/60)+"h "+(t.duration%60)+"m" : "";
+          const isSub = !!t.parentId;
+          const parentName = isSub ? ((day.tasks.find(p => p.id === t.parentId) || {}).name || "") : "";
+          const taskLabel = isSub ? ("\u21b3 " + t.name) : t.name;
+          rows.push([date,emp.name,day.login||"",day.logout||"",total,isSub?"Subtask":"Task",parentName,taskLabel,t.startTime||"",t.endTime||"",durMin,durHM,t.count||0,t.done?"Yes":"No"]);
+        });
+      }
+    });
+  });
+  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);
+  autoResize(sheet, headers.length);
+}
+
+function syncAttendance(ss, attendance, employees) {
+  let sheet = ss.getSheetByName(ATTENDANCE_SHEET);
+  if (!sheet) sheet = ss.insertSheet(ATTENDANCE_SHEET);
+  sheet.clearContents();
+  const headers = ["Date","Employee","Status","Note"];
+  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");
+  const rows = [];
+  employees.forEach(emp => {
+    const empAttendance = (attendance && attendance[emp.id]) || {};
+    Object.keys(empAttendance).sort().forEach(date => {
+      const rec = empAttendance[date];
+      if (!rec || !rec.status) return;
+      rows.push([date, emp.name, rec.status||"", rec.note||""]);
+    });
+  });
+  rows.sort((a,b)=> a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);
+  autoResize(sheet, headers.length);
+}
+
+function syncEmployees(ss, employees) {
+  let sheet = ss.getSheetByName(EMPLOYEES_SHEET);
+  if (!sheet) sheet = ss.insertSheet(EMPLOYEES_SHEET);
+  sheet.clearContents();
+  const headers = ["ID","Name","Username","Email"];
+  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");
+  const rows = employees.map(e => [e.id, e.name, e.username, e.email||""]);
+  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);
+  autoResize(sheet, headers.length);
+}
+
+function autoResize(sheet, numCols) {
+  for (let i=1; i<=numCols; i++) sheet.autoResizeColumn(i);
+}</pre>
+          <button class="btn btn-sm" id="btnCopyScript" style="margin-bottom:12px;">📋 Copy script</button>
+        </div>
+
+        <p class="subhead">Step 3 — Deploy as Web App</p>
+        <div style="background:var(--danger-soft);border:1px solid #e8c0bc;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--danger);">
+          ⚠️ <strong>If you deployed before and got an error — do a NEW deployment, do not edit the old one.</strong>
+        </div>
+        <ol style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;padding-left:18px;line-height:1.8;">
+          <li>Click <strong>Deploy → New deployment</strong> (top-right button)</li>
+          <li>Click the gear icon ⚙️ and select type: <strong>Web app</strong></li>
+          <li>Set <em>Execute as</em>: <strong>Me</strong></li>
+          <li>Set <em>Who has access</em>: <strong>Anyone</strong> (not "Anyone with Google account")</li>
+          <li>Click <strong>Deploy</strong> → Authorize → copy the <em>Web app URL</em></li>
+        </ol>
+
+        <p class="subhead">Step 4 — Paste your Web App URL here</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:260px;">
+            <label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:4px;">Web App URL</label>
+            <input type="text" id="sheetsWebAppUrl" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;" />
+          </div>
+          <button class="btn btn-sm" id="btnTestSheet">Test connection</button>
+          <button class="btn btn-sm btn-accent" id="btnSaveSheetUrl">Save &amp; enable sync</button>
+        </div>
+        <p class="error" id="sheetsUrlError" style="margin-top:6px;"></p>
+        <p class="success-msg" id="sheetsUrlSuccess"></p>
+      </div>
+
+      <div id="sheetsSyncPanel" class="hidden" style="margin-top:0;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <span id="sheetsConnectedLabel" style="font-size:13px;font-weight:500;color:var(--accent-deep);">✓ Connected to Google Sheets</span>
+          <button class="btn btn-sm" id="btnDisconnectSheet" style="color:var(--danger);">Disconnect</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-accent" id="btnManualSync">↑ Sync now</button>
+          <div style="flex:1;">
+            <label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:4px;">Auto-sync every</label>
+            <select class="field" id="autoSyncInterval">
+              <option value="0">Off</option>
+              <option value="60">1 minute</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="1800">30 minutes</option>
+            </select>
+          </div>
+          <div style="flex:2;min-width:200px;">
+            <p style="font-size:12px;color:var(--ink-soft);margin:0 0 4px;">Last synced</p>
+            <p id="lastSyncTime" style="font-size:13px;font-weight:500;margin:0;">Never</p>
+          </div>
+        </div>
+        <p class="error" id="syncError" style="margin-top:8px;"></p>
+        <p class="success-msg" id="syncSuccess"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>✉️ Notify employees by email</h2><span class="hint">Sends a live email to selected employees when there's an update</span></div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">
+        Uses <strong>EmailJS</strong> (a free service that sends email straight from the browser — no server needed). Create a free account at emailjs.com, set up an email service + template, and paste your IDs below once. You only need to do this setup one time.
+      </p>
+      <div class="grid grid-3">
+        <div><label style="font-size:12px;color:var(--ink-soft);">Service ID</label><input type="text" id="emailServiceId" placeholder="e.g. service_abc123" /></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">Template ID</label><input type="text" id="emailTemplateId" placeholder="e.g. template_xyz789" /></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">Public key</label><input type="text" id="emailPublicKey" placeholder="e.g. user_AbCdEf123" /></div>
+      </div>
+      <button class="btn btn-sm" id="btnSaveEmailConfig" style="margin-top:10px;">Save email settings</button>
+      <p class="success-msg" id="emailConfigSaved"></p>
+
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+        <p class="subhead">Send an update</p>
+        <textarea id="notifyMessage" placeholder="Type the update message employees should receive, e.g. 'New training guide added for Medical Records Denial — please review before tomorrow's shift.'" style="width:100%;min-height:80px;font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;"></textarea>
+        <p class="subhead" style="margin-top:12px;">Send to</p>
+        <div class="checkbox-list" id="notifyRecipientList"></div>
+        <div class="error" id="notifyError"></div>
+        <p class="success-msg" id="notifySuccess"></p>
+        <button class="btn btn-accent" id="btnSendNotify" style="margin-top:10px;">Send email update</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+<p class="foot-note">Data is saved locally in this browser. Use "Download Excel" to export records, or connect Google Sheets for real-time sync. · Host this file free on <a href="https://pages.github.com" target="_blank" style="color:var(--accent-deep);">GitHub Pages</a> — no credit card needed.</p>
+</div>
+
+<!-- Add employee modal -->
+<div class="modal-backdrop hidden" id="addEmpModal">
+  <div class="modal">
+    <h3>Add employee</h3>
+    <label>Name</label><input type="text" id="newEmpName" placeholder="e.g. Ravi Kumar" />
+    <label>Username</label><input type="text" id="newEmpUsername" placeholder="e.g. ravi.kumar" />
+    <label>Password</label><input type="text" id="newEmpPassword" placeholder="Set a password" />
+    <label>Email (for live update notifications)</label><input type="email" id="newEmpEmail" placeholder="e.g. ravi@example.com" />
+    <div class="error" id="addEmpError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelAddEmp">Cancel</button>
+      <button class="btn btn-accent" id="confirmAddEmp">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task complete modal -->
+<div class="modal-backdrop hidden" id="countModal">
+  <div class="modal">
+    <h3 id="countModalTitle">Complete task</h3>
+    <label>Count completed</label>
+    <input type="number" id="countInput" min="0" value="1" />
+    <p style="font-size:12px;color:var(--ink-soft);margin:10px 0 0;">Start &amp; end times are recorded automatically when you use the Start/Stop buttons. You can adjust them here if needed.</p>
+    <div class="field-row" style="margin-top:10px;">
+      <div><label>Start time</label><input type="time" id="modalStartTime" /></div>
+      <div><label>End time</label><input type="time" id="modalEndTime" /></div>
+    </div>
+    <div class="error" id="countModalError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelCount">Cancel</button>
+      <button class="btn btn-accent" id="confirmCount">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit my login/logout times modal (employee) -->
+<div class="modal-backdrop hidden" id="editTimesModal">
+  <div class="modal">
+    <h3>Edit today's login / logout time</h3>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 4px;">Use this if you forgot to log in/out on time, or need to correct it. Your manager can see edited times in the history log.</p>
+    <label>Login time</label>
+    <input type="time" id="editLoginTimeInput" />
+    <label>Logout time</label>
+    <input type="time" id="editLogoutTimeInput" />
+    <div class="error" id="editTimesError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelEditTimes">Cancel</button>
+      <button class="btn btn-accent" id="confirmEditTimes">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF viewer modal -->
+<div class="modal-backdrop hidden" id="pdfViewModal">
+  <div class="modal" style="max-width:760px;width:92vw;">
+    <h3 id="pdfViewTitle" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span id="pdfViewName">Document</span>
+      <span class="badge badge-active" style="font-weight:500;">View only</span>
+    </h3>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#525659;">
+      <iframe id="pdfViewFrame" src="" style="width:100%;height:62vh;border:0;display:block;"></iframe>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="closePdfView">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Training guide manage modal -->
+<div class="modal-backdrop hidden" id="guideManageModal">
+  <div class="modal" style="max-width:520px;">
+    <h3 id="guideManageTitle">Scenario</h3>
+    <div class="inline-form" style="margin-top:0;">
+      <input type="text" id="newStepTitle" placeholder="Step title, e.g. Mailing address" />
+    </div>
+    <textarea id="newStepBody" placeholder="Step details / what to ask or note" style="width:100%;margin-top:8px;min-height:60px;font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;"></textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-accent btn-sm" id="btnAddStep">+ Add step</button>
+    </div>
+    <div id="guideStepsList" style="margin-top:14px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btnDeleteGuide">Delete scenario</button>
+      <button class="btn btn-accent" id="closeGuideManage">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Training guide viewer modal -->
+<div class="modal-backdrop hidden" id="guideViewModal">
+  <div class="modal" style="max-width:480px;">
+    <h3 id="guideViewTitle">Scenario</h3>
+    <div class="step-progress" id="guideViewProgress"></div>
+    <div class="step-view-title" id="guideViewStepTitle"></div>
+    <div class="step-view-body" id="guideViewStepBody"></div>
+    <div class="step-counter" id="guideViewCounter"></div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn" id="guideViewPrev">‹ Back</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="closeGuideView">Close</button>
+        <button class="btn btn-accent" id="guideViewNext">Next ›</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Attendance day edit modal -->
+<div class="modal-backdrop hidden" id="attendEditModal">
+  <div class="modal">
+    <h3 id="attendEditTitle">Set attendance</h3>
+    <label>Status</label>
+    <select class="field" id="attendStatusSelect">
+      <option value="">— Not set —</option>
+      <option value="present">Present</option>
+      <option value="absent">Absent</option>
+      <option value="leave">Leave</option>
+      <option value="half">Half day</option>
+      <option value="holiday">Holiday</option>
+    </select>
+    <label>Update / note for this day</label>
+    <textarea id="attendNoteInput" placeholder="e.g. Completed 120 Eligibility calls, left early for appointment" style="width:100%;min-height:70px;font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;"></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="cancelAttendEdit">Cancel</button>
+      <button class="btn btn-accent" id="saveAttendEdit">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Attendance day view modal -->
+<div class="modal-backdrop hidden" id="attendViewModal">
+  <div class="modal">
+    <h3 id="attendViewTitle">Attendance</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 4px;">Status</p>
+    <p id="attendViewStatus" style="font-size:14px;font-weight:600;margin:0 0 14px;">—</p>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 4px;">Manager's note</p>
+    <p id="attendViewNote" style="font-size:13.5px;white-space:pre-wrap;">—</p>
+    <div class="modal-actions">
+      <button class="btn btn-accent" id="closeAttendView">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "workfloor_v4";
+const DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DOW_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const STATUS_LABEL = { present:'Present', absent:'Absent', leave:'Leave', half:'Half day', holiday:'Holiday' };
+const STATUS_CLASS = { present:'st-present', absent:'st-absent', leave:'st-leave', half:'st-half', holiday:'st-holiday' };
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKey(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+function dowIndexMonFirst(jsDay){ return (jsDay + 6) % 7; }
+
+function formatTime(d){ return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
+function timeToMinutes(t){
+  if(!t) return null;
+  const [hm, ampm] = t.split(' ');
+  let [h, m] = hm.split(':').map(Number);
+  if(ampm === 'PM' && h !== 12) h += 12;
+  if(ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+function minutesToHM(min){
+  if(min === null || min === undefined || min < 0) return "—";
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function inputTimeTo12(t){
+  if(!t) return null;
+  let [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function time12ToInput(t){
+  if(!t) return '';
+  const [hm, ampm] = t.split(' ');
+  let [h, m] = hm.split(':').map(Number);
+  if(ampm === 'PM' && h !== 12) h += 12;
+  if(ampm === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function calcDuration(start, end){
+  const s = timeToMinutes(start), e = timeToMinutes(end);
+  if(s === null || e === null) return null;
+  return Math.max(0, e - s);
+}
+function fmtBytes(n){
+  if(n < 1024) return n + " B";
+  if(n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/(1024*1024)).toFixed(1) + " MB";
+}
+function fmtDate(iso){ return new Date(iso).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'}); }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function initials(n){ return n.split(" ").map(p=>p[0]).join("").slice(0,2).toUpperCase(); }
+
+function loadData(){
+  let raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try{
+      const p = JSON.parse(raw);
+      if(p.employees && p.managers){
+        if(!p.documents) p.documents = [];
+        if(!p.trainingGuides) p.trainingGuides = [];
+        if(!p.attendance) p.attendance = {};
+        if(!p.weeklySchedule) p.weeklySchedule = {};
+        if(!p.emailConfig) p.emailConfig = {serviceId:'', templateId:'', publicKey:''};
+        p.employees.forEach(e=>{ if(e.email===undefined) e.email=''; });
+        return p;
+      }
+    }catch(e){}
+  }
+  const seed = {
+    employees:[
+      {id:"e1",name:"Ravi Kumar",username:"ravi",password:"ravi123",email:""},
+      {id:"e2",name:"Priya Sharma",username:"priya",password:"priya123",email:""},
+      {id:"e3",name:"Amit Singh",username:"amit",password:"amit123",email:""}
+    ],
+    managers:[{username:"admin",password:"admin123"}],
+    days:{},
+    documents:[],
+    trainingGuides:[
+      { id:"g1", title:"Medical Records Denial", steps:[
+        { id:"s1", title:"Where to submit medical records", body:"Ask the rep for the exact department name responsible for receiving medical records (e.g. \"Medical Records Review Department\"). Write the department name down before moving on." },
+        { id:"s2", title:"Mailing address", body:"Ask for the complete mailing address for that department — including suite/floor number and ZIP code." },
+        { id:"s3", title:"Timely filing limit", body:"Ask how many days from the date of denial the medical records must be received by. Note the exact number of days." },
+        { id:"s4", title:"Fax number", body:"Ask if the records can be faxed, and if so, note the fax number." },
+        { id:"s5", title:"Portal upload available?", body:"Ask whether the records can instead be uploaded through the provider/payer portal, and note the portal name if yes." },
+        { id:"s6", title:"Collect call reference number", body:"Before ending the call, always ask for the call reference number and record it in the notes." }
+      ]}
+    ],
+    attendance:{},
+    weeklySchedule:{
+      e2: { Mon:"", Tue:"Eligibility verification calls", Wed:"", Thu:"", Fri:"Verify Echo authorization for Monday's scheduled visits", Sat:"", Sun:"" }
+    },
+    emailConfig:{serviceId:'', templateId:'', publicKey:''}
+  };
+  const t = todayStr();
+  seed.days[t] = {
+    e1:{ login:null, logout:null, tasks:[
+      {id:"t1",name:"Eligibility",done:false,count:0,startTime:null,endTime:null,duration:null},
+      {id:"t2",name:"AR Calling",done:false,count:0,startTime:null,endTime:null,duration:null}
+    ]},
+    e2:{ login:"08:55 AM", logout:"05:30 PM", tasks:[
+      {id:"t3",name:"Authorization check",done:true,count:142,startTime:"09:00 AM",endTime:"12:30 PM",duration:210}
+    ]},
+    e3:{ login:"09:10 AM", logout:null, tasks:[
+      {id:"t4",name:"Eligibility",done:true,count:98,startTime:"09:15 AM",endTime:"11:45 AM",duration:150},
+      {id:"t5",name:"AR Calling",done:false,count:0,startTime:"01:00 PM",endTime:null,duration:null}
+    ]}
+  };
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(seed));
+  return seed;
+}
+function saveData(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(data)); }
+
+let data = loadData();
+let session = null;
+let liveTimers = {};
+
+function ensureDay(empId, dateStr){
+  if(!data.days[dateStr]) data.days[dateStr]={};
+  if(!data.days[dateStr][empId]) data.days[dateStr][empId]={login:null,logout:null,tasks:[]};
+  return data.days[dateStr][empId];
+}
+function dayTotal(day){ return day.tasks.filter(t=>!t.parentId).reduce((s,t)=>s+(parseInt(t.count)||0),0); }
+
+/* ---- LOGIN ---- */
+let loginMode = 'employee';
+const loginScreen = document.getElementById('loginScreen');
+const appRoot = document.getElementById('appRoot');
+
+function setLoginMode(m){
+  loginMode = m;
+  document.getElementById('loginError').textContent="";
+  document.getElementById('loginUsername').value="";
+  document.getElementById('loginPassword').value="";
+  document.getElementById('loginTitle').textContent = m==='manager'?"Manager sign in":"Sign in";
+  document.getElementById('loginSub').textContent = m==='manager'?"Enter manager credentials.":"Enter your username and password.";
+  document.getElementById('goManagerLogin').style.display = m==='manager'?'none':'';
+  document.getElementById('empLoginLink').style.display = m==='manager'?'':'none';
+}
+document.getElementById('goManagerLogin').addEventListener('click',()=>setLoginMode('manager'));
+document.getElementById('goEmployeeLogin').addEventListener('click',()=>setLoginMode('employee'));
+document.getElementById('btnDoLogin').addEventListener('click', doLogin);
+document.getElementById('loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+
+function doLogin(){
+  const u=document.getElementById('loginUsername').value.trim();
+  const p=document.getElementById('loginPassword').value;
+  const errEl=document.getElementById('loginError');
+  errEl.textContent="";
+  if(!u||!p){ errEl.textContent="Please enter both fields."; return; }
+  if(loginMode==='manager'){
+    const mgr=data.managers.find(m=>m.username===u&&m.password===p);
+    if(!mgr){ errEl.textContent="Incorrect manager credentials."; return; }
+    session={role:'manager', username:mgr.username};
+  } else {
+    const emp=data.employees.find(e=>e.username===u&&e.password===p);
+    if(!emp){ errEl.textContent="Incorrect username or password."; return; }
+    session={role:'employee',empId:emp.id};
+  }
+  enterApp();
+}
+document.getElementById('btnLogoutApp').addEventListener('click',()=>{
+  clearAllTimers();
+  session=null;
+  appRoot.classList.add('hidden');
+  loginScreen.classList.remove('hidden');
+  setLoginMode('employee');
+});
+function clearAllTimers(){ Object.values(liveTimers).forEach(id=>clearInterval(id)); liveTimers={}; }
+
+function enterApp(){
+  loginScreen.classList.add('hidden');
+  appRoot.classList.remove('hidden');
+  const ev=document.getElementById('employeeView'), mv=document.getElementById('managerView');
+  if(session.role==='manager'){
+    document.getElementById('whoami').textContent="Signed in as "+session.username+" (Manager)";
+    mv.classList.remove('hidden'); ev.classList.add('hidden');
+    mgrCalDate = new Date();
+    renderManagerView();
+  } else {
+    const emp=data.employees.find(e=>e.id===session.empId);
+    document.getElementById('whoami').textContent="Signed in as "+(emp?emp.name:"Employee");
+    ev.classList.remove('hidden'); mv.classList.add('hidden');
+    empCalDate = new Date();
+    renderEmployeeView();
+  }
+  // Auto-start sync for all users as soon as they log in
+  if(getSheetsUrl()){
+    const savedInterval = parseInt(localStorage.getItem(SHEETS_INTERVAL_KEY)||'300');
+    startAutoSync(savedInterval);
+    // Do an immediate sync on login so data is always fresh
+    doSync(true);
+  }
+}
+setLoginMode('employee');
+
+/* ============================================================
+   EMPLOYEE VIEW
+   ============================================================ */
+function renderEmployeeView(){
+  const empId=session.empId;
+  const emp=data.employees.find(e=>e.id===empId);
+  if(!emp) return;
+  const today=todayStr();
+  const day=ensureDay(empId,today);
+
+  document.getElementById('empGreeting').textContent="Hi, "+emp.name.split(" ")[0];
+  document.getElementById('empDate').textContent=new Date().toLocaleDateString([],{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('empLoginTime').textContent=day.login||"—";
+  document.getElementById('empLoginSub').textContent=day.login?"Logged in":"Not logged in yet";
+  document.getElementById('empLogoutTime').textContent=day.logout||"—";
+  document.getElementById('empLogoutSub').textContent=day.logout?"Day complete":(day.login?"Still working":"—");
+  document.getElementById('empUnits').textContent=dayTotal(day);
+
+  document.getElementById('btnLogin').disabled=!!day.login;
+  document.getElementById('btnLogout').disabled=!day.login||!!day.logout;
+
+  clearAllTimers();
+
+  const list=document.getElementById('empTaskList');
+  const noTasks=document.getElementById('empNoTasks');
+  list.innerHTML="";
+
+  const parentTasks=day.tasks.filter(t=>!t.parentId);
+  const subtasksOf=id=>day.tasks.filter(t=>t.parentId===id);
+
+  if(day.tasks.length===0){ noTasks.classList.remove('hidden'); } else { noTasks.classList.add('hidden'); }
+
+  parentTasks.forEach(task=>{
+    const subs=subtasksOf(task.id);
+    const isRunning = !!task.startTime && !task.done && !task.endTime;
+    const block=document.createElement('div');
+    block.className='task-block'+(task.done?' done':'')+(isRunning?' running':'');
+    block.dataset.taskId=task.id;
+    const durationStr = task.duration !== null && task.duration !== undefined ? minutesToHM(task.duration) : "—";
+
+    block.innerHTML=`
+      <div class="task-block-head">
+        <input type="checkbox" ${task.done?'checked':''} />
+        <span class="task-block-name">${esc(task.name)}</span>
+        ${task.done?`<span class="badge badge-done">Done</span>`:''}
+        ${isRunning?`<span class="badge badge-running">▶ Running</span>`:''}
+      </div>
+      <div class="task-meta">
+        <div class="task-meta-item">🕐 Start: <strong>${task.startTime||"—"}</strong></div>
+        <div class="task-meta-item">🕔 End: <strong>${task.endTime||"—"}</strong></div>
+        <div class="task-meta-item">⏱ Duration: <span class="${task.done?'duration-pill done':'duration-pill'}" id="dur_${task.id}">${durationStr}</span></div>
+        <div class="task-meta-item">📋 Count: <strong>${task.count||0}</strong></div>
+      </div>
+      <div class="task-actions">
+        ${!task.startTime&&!task.done?`<button class="btn btn-sm btn-accent startTask" data-id="${task.id}">▶ Start task</button>`:''}
+        ${isRunning?`<button class="btn btn-sm stopTask" data-id="${task.id}">⏹ Stop &amp; complete</button>`:''}
+        ${task.done?`<button class="btn btn-sm" style="color:var(--ink-soft);" disabled>✓ Completed</button>`:''}
+      </div>
+      ${subs.length>0?`<div class="subtask-list" id="subs_${task.id}"></div>`:''}
+    `;
+    list.appendChild(block);
+
+    if(subs.length>0){
+      const subList=block.querySelector(`#subs_${task.id}`);
+      subs.forEach(sub=>{
+        const subRunning=!!sub.startTime&&!sub.done&&!sub.endTime;
+        const subDur=sub.duration!==null&&sub.duration!==undefined?minutesToHM(sub.duration):"—";
+        const subBlock=document.createElement('div');
+        subBlock.className='task-block subtask'+(sub.done?' done':'')+(subRunning?' running':'');
+        subBlock.dataset.taskId=sub.id;
+        subBlock.innerHTML=`
+          <div class="task-block-head">
+            <input type="checkbox" ${sub.done?'checked':''} />
+            <span class="task-block-name" style="font-size:13px;">↳ ${esc(sub.name)}</span>
+            ${sub.done?`<span class="badge badge-done">Done</span>`:''}
+            ${subRunning?`<span class="badge badge-running">▶ Running</span>`:''}
+          </div>
+          <div class="task-meta">
+            <div class="task-meta-item">🕐 Start: <strong>${sub.startTime||"—"}</strong></div>
+            <div class="task-meta-item">🕔 End: <strong>${sub.endTime||"—"}</strong></div>
+            <div class="task-meta-item">⏱ Duration: <span class="${sub.done?'duration-pill done':'duration-pill'}" id="dur_${sub.id}">${subDur}</span></div>
+            <div class="task-meta-item">📋 Count: <strong>${sub.count||0}</strong></div>
+          </div>
+          <div class="task-actions">
+            ${!sub.startTime&&!sub.done?`<button class="btn btn-sm btn-accent startTask" data-id="${sub.id}">▶ Start subtask</button>`:''}
+            ${subRunning?`<button class="btn btn-sm stopTask" data-id="${sub.id}">⏹ Stop &amp; complete</button>`:''}
+            ${sub.done?`<button class="btn btn-sm" style="color:var(--ink-soft);" disabled>✓ Completed</button>`:''}
+          </div>
+        `;
+        subList.appendChild(subBlock);
+        if(subRunning){
+          const durEl=subBlock.querySelector(`#dur_${sub.id}`);
+          const startMin=timeToMinutes(sub.startTime);
+          function tickSub(){ const now=new Date(); durEl.textContent=minutesToHM(Math.max(0,(now.getHours()*60+now.getMinutes())-startMin)); }
+          tickSub(); liveTimers[sub.id]=setInterval(tickSub,30000);
+        }
+      });
+    }
+
+    if(isRunning){
+      const durEl=block.querySelector(`#dur_${task.id}`);
+      const startMin=timeToMinutes(task.startTime);
+      function tick(){ const now=new Date(); durEl.textContent=minutesToHM(Math.max(0,(now.getHours()*60+now.getMinutes())-startMin)); }
+      tick(); liveTimers[task.id]=setInterval(tick,30000);
+    }
+  });
+
+  list.querySelectorAll('.startTask').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const task=day.tasks.find(t=>t.id===btn.dataset.id);
+      if(!task) return;
+      task.startTime=formatTime(new Date()); task.endTime=null; task.done=false;
+      saveData(); renderEmployeeView();
+    });
+  });
+  list.querySelectorAll('.stopTask').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const task=day.tasks.find(t=>t.id===btn.dataset.id);
+      if(task) openCountModal(task);
+    });
+  });
+  list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change',e=>{
+      const block=e.target.closest('.task-block');
+      const task=day.tasks.find(t=>t.id===block.dataset.taskId);
+      if(!task) return;
+      if(e.target.checked){
+        e.target.checked=false;
+        if(!task.startTime) task.startTime=formatTime(new Date());
+        openCountModal(task);
+      } else {
+        task.done=false; saveData(); renderEmployeeView();
+      }
+    });
+  });
+
+  const doneCount=day.tasks.filter(t=>t.done).length;
+  document.getElementById('taskProgress').textContent=day.tasks.length?`${doneCount} of ${day.tasks.length} done`:"";
+
+  renderEmpDocuments();
+  renderEmpGuides();
+  renderEmpWeekSchedule();
+  renderEmpCalendar();
+}
+
+document.getElementById('btnLogin').addEventListener('click',()=>{
+  const day=ensureDay(session.empId,todayStr());
+  if(!day.login){ day.login=formatTime(new Date()); saveData(); renderEmployeeView(); }
+});
+document.getElementById('btnLogout').addEventListener('click',()=>{
+  const day=ensureDay(session.empId,todayStr());
+  if(day.login&&!day.logout){ day.logout=formatTime(new Date()); saveData(); renderEmployeeView(); }
+});
+
+document.getElementById('btnEditMyTimes').addEventListener('click',()=>{
+  const day=ensureDay(session.empId,todayStr());
+  document.getElementById('editLoginTimeInput').value = time12ToInput(day.login) || '';
+  document.getElementById('editLogoutTimeInput').value = time12ToInput(day.logout) || '';
+  document.getElementById('editTimesError').textContent='';
+  document.getElementById('editTimesModal').classList.remove('hidden');
+});
+document.getElementById('cancelEditTimes').addEventListener('click',()=>{
+  document.getElementById('editTimesModal').classList.add('hidden');
+});
+document.getElementById('confirmEditTimes').addEventListener('click',()=>{
+  const day=ensureDay(session.empId,todayStr());
+  const errEl=document.getElementById('editTimesError');
+  const loginRaw=document.getElementById('editLoginTimeInput').value;
+  const logoutRaw=document.getElementById('editLogoutTimeInput').value;
+  const newLogin = loginRaw ? inputTimeTo12(loginRaw) : null;
+  const newLogout = logoutRaw ? inputTimeTo12(logoutRaw) : null;
+  if(newLogin && newLogout && calcDuration(newLogin,newLogout) < 0){
+    errEl.textContent = "Logout time must be after login time.";
+    return;
+  }
+  day.login = newLogin;
+  day.logout = newLogout;
+  saveData();
+  document.getElementById('editTimesModal').classList.add('hidden');
+  renderEmployeeView();
+});
+
+const countModal=document.getElementById('countModal');
+let activeTask=null;
+function openCountModal(task){
+  activeTask=task;
+  document.getElementById('countModalTitle').textContent=task.name;
+  document.getElementById('countInput').value=task.count||'';
+  document.getElementById('modalStartTime').value=time12ToInput(task.startTime)||time12ToInput(formatTime(new Date()));
+  document.getElementById('modalEndTime').value=time12ToInput(formatTime(new Date()));
+  document.getElementById('countModalError').textContent='';
+  countModal.classList.remove('hidden');
+}
+document.getElementById('cancelCount').addEventListener('click',()=>{ countModal.classList.add('hidden'); activeTask=null; });
+document.getElementById('confirmCount').addEventListener('click',()=>{
+  if(!activeTask) return;
+  const count=parseInt(document.getElementById('countInput').value)||0;
+  const startRaw=document.getElementById('modalStartTime').value;
+  const endRaw=document.getElementById('modalEndTime').value;
+  const errEl=document.getElementById('countModalError');
+  if(!startRaw||!endRaw){ errEl.textContent="Please set both start and end times."; return; }
+  const start12=inputTimeTo12(startRaw), end12=inputTimeTo12(endRaw);
+  const dur=calcDuration(start12,end12);
+  if(dur<0){ errEl.textContent="End time must be after start time."; return; }
+  activeTask.count=count; activeTask.startTime=start12; activeTask.endTime=end12; activeTask.duration=dur; activeTask.done=true;
+  saveData(); countModal.classList.add('hidden'); activeTask=null; renderEmployeeView();
+});
+
+/* ============================================================
+   DOCUMENTS
+   ============================================================ */
+function renderMgrDocuments(){
+  const list = document.getElementById('mgrDocList');
+  const empty = document.getElementById('mgrNoDocs');
+  list.innerHTML = "";
+  if(!data.documents || data.documents.length === 0){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  data.documents.slice().reverse().forEach(doc=>{
+    const row = document.createElement('div');
+    row.className = 'doc-row';
+    row.innerHTML = `
+      <div class="doc-icon">PDF</div>
+      <div class="doc-info">
+        <div class="doc-name">${esc(doc.name)}</div>
+        <div class="doc-meta">${fmtBytes(doc.size)} · uploaded ${fmtDate(doc.uploadedAt)}</div>
+      </div>
+      <div class="doc-actions">
+        <button class="btn btn-sm viewDoc" data-id="${doc.id}">View</button>
+        <button class="btn btn-sm btn-danger delDoc" data-id="${doc.id}">Delete</button>
+      </div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.viewDoc').forEach(btn=>btn.addEventListener('click', ()=> openPdfViewer(btn.dataset.id)));
+  list.querySelectorAll('.delDoc').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const doc = data.documents.find(d=>d.id===btn.dataset.id);
+      if(!doc) return;
+      if(!confirm(`Delete "${doc.name}"? Employees will no longer be able to see it.`)) return;
+      data.documents = data.documents.filter(d=>d.id!==btn.dataset.id);
+      saveData(); renderMgrDocuments();
+    });
+  });
+}
+function renderEmpDocuments(){
+  const list = document.getElementById('empDocList');
+  const empty = document.getElementById('empNoDocs');
+  if(!list) return;
+  list.innerHTML = "";
+  if(!data.documents || data.documents.length === 0){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  data.documents.slice().reverse().forEach(doc=>{
+    const row = document.createElement('div');
+    row.className = 'doc-row';
+    row.innerHTML = `
+      <div class="doc-icon">PDF</div>
+      <div class="doc-info">
+        <div class="doc-name">${esc(doc.name)}</div>
+        <div class="doc-meta">${fmtBytes(doc.size)} · shared ${fmtDate(doc.uploadedAt)}</div>
+      </div>
+      <div class="doc-actions"><button class="btn btn-sm viewDoc" data-id="${doc.id}">View</button></div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.viewDoc').forEach(btn=>btn.addEventListener('click', ()=> openPdfViewer(btn.dataset.id)));
+}
+function openPdfViewer(docId){
+  const doc = data.documents.find(d=>d.id===docId);
+  if(!doc) return;
+  document.getElementById('pdfViewName').textContent = doc.name;
+  document.getElementById('pdfViewFrame').src = doc.dataUrl + "#toolbar=0&navpanes=0";
+  document.getElementById('pdfViewModal').classList.remove('hidden');
+}
+document.getElementById('closePdfView').addEventListener('click', ()=>{
+  document.getElementById('pdfViewModal').classList.add('hidden');
+  document.getElementById('pdfViewFrame').src = "";
+});
+document.getElementById('btnUploadPdf').addEventListener('click', ()=>{
+  const input = document.getElementById('pdfUploadInput');
+  const errEl = document.getElementById('pdfUploadError');
+  errEl.textContent = "";
+  const file = input.files[0];
+  if(!file){ errEl.textContent = "Please choose a PDF file first."; return; }
+  if(file.type !== 'application/pdf'){ errEl.textContent = "Only PDF files are allowed."; return; }
+  if(file.size > 8*1024*1024){ errEl.textContent = "File too large. Please keep PDFs under 8MB."; return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      data.documents.push({ id:"doc"+Date.now(), name:file.name, size:file.size, uploadedAt:new Date().toISOString(), dataUrl:reader.result });
+      saveData(); input.value = ""; renderMgrDocuments();
+    }catch(e){ errEl.textContent = "Could not save file — it may be too large for browser storage."; }
+  };
+  reader.onerror = ()=>{ errEl.textContent = "Could not read file."; };
+  reader.readAsDataURL(file);
+});
+
+/* ============================================================
+   TRAINING GUIDES
+   ============================================================ */
+function renderMgrGuides(){
+  const list = document.getElementById('mgrGuideList');
+  const empty = document.getElementById('mgrNoGuides');
+  list.innerHTML = "";
+  if(!data.trainingGuides || data.trainingGuides.length===0){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  data.trainingGuides.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'guide-row';
+    row.innerHTML = `
+      <div class="guide-icon">📋</div>
+      <div class="guide-info">
+        <div class="guide-title">${esc(g.title)}</div>
+        <div class="guide-meta">${g.steps.length} step${g.steps.length===1?'':'s'}</div>
+      </div>
+      <div class="guide-actions">
+        <button class="btn btn-sm manageGuide" data-id="${g.id}">Manage steps</button>
+      </div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.manageGuide').forEach(btn=>btn.addEventListener('click', ()=>openGuideManage(btn.dataset.id)));
+}
+document.getElementById('btnAddGuide').addEventListener('click', ()=>{
+  const input = document.getElementById('newGuideTitle');
+  const title = input.value.trim();
+  if(!title) return;
+  data.trainingGuides.push({ id:"g"+Date.now(), title, steps:[] });
+  saveData(); input.value=''; renderMgrGuides();
+});
+
+let activeGuideId = null;
+function openGuideManage(guideId){
+  activeGuideId = guideId;
+  const g = data.trainingGuides.find(x=>x.id===guideId);
+  if(!g) return;
+  document.getElementById('guideManageTitle').textContent = g.title;
+  document.getElementById('newStepTitle').value = '';
+  document.getElementById('newStepBody').value = '';
+  renderGuideStepsEditor();
+  document.getElementById('guideManageModal').classList.remove('hidden');
+}
+function renderGuideStepsEditor(){
+  const g = data.trainingGuides.find(x=>x.id===activeGuideId);
+  const wrap = document.getElementById('guideStepsList');
+  wrap.innerHTML = '';
+  if(!g) return;
+  g.steps.forEach((step,idx)=>{
+    const div = document.createElement('div');
+    div.className = 'guide-edit-step';
+    div.innerHTML = `
+      <div class="gstep-title">${idx+1}. ${esc(step.title)}</div>
+      <div class="gstep-body">${esc(step.body)}</div>
+      <div class="gstep-actions">
+        ${idx>0?`<button class="btn btn-sm moveUp" data-id="${step.id}">↑ Move up</button>`:''}
+        ${idx<g.steps.length-1?`<button class="btn btn-sm moveDown" data-id="${step.id}">↓ Move down</button>`:''}
+        <button class="btn btn-sm editStep" data-id="${step.id}">Edit</button>
+        <button class="btn btn-sm btn-danger delStep" data-id="${step.id}">Delete</button>
+      </div>`;
+    wrap.appendChild(div);
+  });
+  wrap.querySelectorAll('.delStep').forEach(btn=>btn.addEventListener('click', ()=>{
+    g.steps = g.steps.filter(s=>s.id!==btn.dataset.id);
+    saveData(); renderGuideStepsEditor();
+  }));
+  wrap.querySelectorAll('.editStep').forEach(btn=>btn.addEventListener('click', ()=>{
+    const step = g.steps.find(s=>s.id===btn.dataset.id);
+    if(!step) return;
+    const newTitle = prompt("Step title:", step.title);
+    if(newTitle===null) return;
+    const newBody = prompt("Step details:", step.body);
+    if(newBody===null) return;
+    step.title = newTitle.trim()||step.title; step.body = newBody.trim();
+    saveData(); renderGuideStepsEditor();
+  }));
+  wrap.querySelectorAll('.moveUp').forEach(btn=>btn.addEventListener('click', ()=>{
+    const i = g.steps.findIndex(s=>s.id===btn.dataset.id);
+    if(i>0){ [g.steps[i-1],g.steps[i]]=[g.steps[i],g.steps[i-1]]; saveData(); renderGuideStepsEditor(); }
+  }));
+  wrap.querySelectorAll('.moveDown').forEach(btn=>btn.addEventListener('click', ()=>{
+    const i = g.steps.findIndex(s=>s.id===btn.dataset.id);
+    if(i<g.steps.length-1){ [g.steps[i+1],g.steps[i]]=[g.steps[i],g.steps[i+1]]; saveData(); renderGuideStepsEditor(); }
+  }));
+}
+document.getElementById('btnAddStep').addEventListener('click', ()=>{
+  const g = data.trainingGuides.find(x=>x.id===activeGuideId);
+  if(!g) return;
+  const title = document.getElementById('newStepTitle').value.trim();
+  const body = document.getElementById('newStepBody').value.trim();
+  if(!title){ alert("Please enter a step title."); return; }
+  g.steps.push({ id:"s"+Date.now(), title, body });
+  saveData();
+  document.getElementById('newStepTitle').value='';
+  document.getElementById('newStepBody').value='';
+  renderGuideStepsEditor();
+});
+document.getElementById('btnDeleteGuide').addEventListener('click', ()=>{
+  const g = data.trainingGuides.find(x=>x.id===activeGuideId);
+  if(!g) return;
+  if(!confirm(`Delete the "${g.title}" training scenario? This cannot be undone.`)) return;
+  data.trainingGuides = data.trainingGuides.filter(x=>x.id!==activeGuideId);
+  saveData();
+  document.getElementById('guideManageModal').classList.add('hidden');
+  renderMgrGuides();
+});
+document.getElementById('closeGuideManage').addEventListener('click', ()=>{
+  document.getElementById('guideManageModal').classList.add('hidden');
+  renderMgrGuides();
+});
+
+function renderEmpGuides(){
+  const list = document.getElementById('empGuideList');
+  const empty = document.getElementById('empNoGuides');
+  if(!list) return;
+  list.innerHTML = '';
+  if(!data.trainingGuides || data.trainingGuides.length===0){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  data.trainingGuides.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'guide-row';
+    row.innerHTML = `
+      <div class="guide-icon">📋</div>
+      <div class="guide-info">
+        <div class="guide-title">${esc(g.title)}</div>
+        <div class="guide-meta">${g.steps.length} step${g.steps.length===1?'':'s'}</div>
+      </div>
+      <div class="guide-actions"><button class="btn btn-sm btn-accent openGuide" data-id="${g.id}">Open</button></div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.openGuide').forEach(btn=>btn.addEventListener('click', ()=>openGuideView(btn.dataset.id)));
+}
+let viewGuide=null, viewStepIdx=0;
+function openGuideView(guideId){
+  viewGuide = data.trainingGuides.find(g=>g.id===guideId);
+  if(!viewGuide || viewGuide.steps.length===0){ alert("This scenario has no steps yet."); return; }
+  viewStepIdx = 0;
+  document.getElementById('guideViewTitle').textContent = viewGuide.title;
+  renderGuideViewStep();
+  document.getElementById('guideViewModal').classList.remove('hidden');
+}
+function renderGuideViewStep(){
+  const step = viewGuide.steps[viewStepIdx];
+  document.getElementById('guideViewStepTitle').textContent = step.title;
+  document.getElementById('guideViewStepBody').textContent = step.body || "(no extra details)";
+  document.getElementById('guideViewCounter').textContent = `Step ${viewStepIdx+1} of ${viewGuide.steps.length}`;
+  const prog = document.getElementById('guideViewProgress');
+  prog.innerHTML = '';
+  viewGuide.steps.forEach((s,i)=>{
+    const dot = document.createElement('div');
+    dot.className = 'dot'+(i===viewStepIdx?' active':(i<viewStepIdx?' past':''));
+    prog.appendChild(dot);
+  });
+  document.getElementById('guideViewPrev').disabled = viewStepIdx===0;
+  document.getElementById('guideViewNext').textContent = viewStepIdx===viewGuide.steps.length-1 ? "Finish ✓" : "Next ›";
+}
+document.getElementById('guideViewPrev').addEventListener('click', ()=>{ if(viewStepIdx>0){ viewStepIdx--; renderGuideViewStep(); } });
+document.getElementById('guideViewNext').addEventListener('click', ()=>{
+  if(viewStepIdx < viewGuide.steps.length-1){ viewStepIdx++; renderGuideViewStep(); }
+  else { document.getElementById('guideViewModal').classList.add('hidden'); }
+});
+document.getElementById('closeGuideView').addEventListener('click', ()=>{ document.getElementById('guideViewModal').classList.add('hidden'); });
+
+/* ============================================================
+   WEEKLY SCHEDULE
+   ============================================================ */
+function ensureWeekSched(empId){
+  if(!data.weeklySchedule[empId]) data.weeklySchedule[empId] = { Mon:"",Tue:"",Wed:"",Thu:"",Fri:"",Sat:"",Sun:"" };
+  return data.weeklySchedule[empId];
+}
+function renderMgrWeekSchedule(){
+  const sel = document.getElementById('weekScheduleEmp');
+  const empId = sel.value || (data.employees[0] && data.employees[0].id);
+  if(!empId) return;
+  const sched = ensureWeekSched(empId);
+  const todayIdx = dowIndexMonFirst(new Date().getDay());
+  const wrap = document.getElementById('mgrWeekSchedule');
+  wrap.innerHTML = '';
+  DOW.forEach((d,i)=>{
+    const row = document.createElement('div');
+    row.className = 'week-row'+(i===todayIdx?' today':'');
+    row.innerHTML = `
+      <div class="week-day-label">${DOW_FULL[i]}</div>
+      <input type="text" class="week-edit-input" data-day="${d}" placeholder="No task set — type to add" value="${esc(sched[d]||'')}" />
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.week-edit-input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{ sched[inp.dataset.day] = inp.value.trim(); saveData(); });
+  });
+}
+document.getElementById('weekScheduleEmp').addEventListener('change', renderMgrWeekSchedule);
+
+function renderEmpWeekSchedule(){
+  const wrap = document.getElementById('empWeekSchedule');
+  if(!wrap) return;
+  const sched = ensureWeekSched(session.empId);
+  const todayIdx = dowIndexMonFirst(new Date().getDay());
+  wrap.innerHTML = '';
+  DOW.forEach((d,i)=>{
+    const row = document.createElement('div');
+    row.className = 'week-row'+(i===todayIdx?' today':'');
+    const text = sched[d];
+    row.innerHTML = `
+      <div class="week-day-label">${DOW_FULL[i]}${i===todayIdx?' · Today':''}</div>
+      <div class="week-task-text${text?'':' empty'}">${text?esc(text):'Nothing scheduled'}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+/* ============================================================
+   ATTENDANCE CALENDAR
+   ============================================================ */
+let mgrCalDate = new Date();
+let empCalDate = new Date();
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function ensureAttend(empId){
+  if(!data.attendance[empId]) data.attendance[empId] = {};
+  return data.attendance[empId];
+}
+function buildCalendarGrid(gridEl, year, month, empId, editable){
+  gridEl.innerHTML = '';
+  DOW.forEach(d=>{
+    const h = document.createElement('div'); h.className = 'cal-dow'; h.textContent = d; gridEl.appendChild(h);
+  });
+  const firstDay = new Date(year, month, 1);
+  const startOffset = dowIndexMonFirst(firstDay.getDay());
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayK = todayStr();
+  const att = ensureAttend(empId);
+
+  for(let i=0;i<startOffset;i++){
+    const e = document.createElement('div'); e.className = 'cal-cell empty'; gridEl.appendChild(e);
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const key = dateKey(year, month, d);
+    const rec = att[key];
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (editable?' clickable':'') + (rec&&rec.status?` ${STATUS_CLASS[rec.status]}`:'') + (key===todayK?' today':'');
+    cell.innerHTML = `<span class="cal-num">${d}</span>${rec&&rec.status?`<span class="cal-status-label">${STATUS_LABEL[rec.status]}</span>`:''}`;
+    if(editable){
+      cell.addEventListener('click', ()=> openAttendEdit(empId, key, d, year, month));
+    } else if(rec && (rec.status || rec.note)){
+      cell.addEventListener('click', ()=> openAttendView(rec, key, d, year, month));
+      cell.classList.add('clickable');
+    }
+    gridEl.appendChild(cell);
+  }
+}
+function renderMgrCalendar(){
+  const empSel = document.getElementById('mgrCalEmp');
+  const empId = empSel.value || (data.employees[0] && data.employees[0].id);
+  if(!empId) return;
+  document.getElementById('mgrCalLabel').textContent = `${MONTH_NAMES[mgrCalDate.getMonth()]} ${mgrCalDate.getFullYear()}`;
+  buildCalendarGrid(document.getElementById('mgrCalGrid'), mgrCalDate.getFullYear(), mgrCalDate.getMonth(), empId, true);
+}
+document.getElementById('mgrCalPrev').addEventListener('click', ()=>{ mgrCalDate.setMonth(mgrCalDate.getMonth()-1); renderMgrCalendar(); });
+document.getElementById('mgrCalNext').addEventListener('click', ()=>{ mgrCalDate.setMonth(mgrCalDate.getMonth()+1); renderMgrCalendar(); });
+document.getElementById('mgrCalEmp').addEventListener('change', renderMgrCalendar);
+
+function renderEmpCalendar(){
+  const grid = document.getElementById('empCalGrid');
+  if(!grid) return;
+  document.getElementById('empCalLabel').textContent = `${MONTH_NAMES[empCalDate.getMonth()]} ${empCalDate.getFullYear()}`;
+  buildCalendarGrid(grid, empCalDate.getFullYear(), empCalDate.getMonth(), session.empId, false);
+}
+document.getElementById('empCalPrev').addEventListener('click', ()=>{ empCalDate.setMonth(empCalDate.getMonth()-1); renderEmpCalendar(); });
+document.getElementById('empCalNext').addEventListener('click', ()=>{ empCalDate.setMonth(empCalDate.getMonth()+1); renderEmpCalendar(); });
+
+let attendEditCtx = null;
+function openAttendEdit(empId, key, d, year, month){
+  attendEditCtx = { empId, key };
+  const att = ensureAttend(empId);
+  const rec = att[key] || { status:'', note:'' };
+  document.getElementById('attendEditTitle').textContent = `${MONTH_NAMES[month]} ${d}, ${year}`;
+  document.getElementById('attendStatusSelect').value = rec.status || '';
+  document.getElementById('attendNoteInput').value = rec.note || '';
+  document.getElementById('attendEditModal').classList.remove('hidden');
+}
+document.getElementById('cancelAttendEdit').addEventListener('click', ()=>{ document.getElementById('attendEditModal').classList.add('hidden'); });
+document.getElementById('saveAttendEdit').addEventListener('click', ()=>{
+  if(!attendEditCtx) return;
+  const status = document.getElementById('attendStatusSelect').value;
+  const note = document.getElementById('attendNoteInput').value.trim();
+  const att = ensureAttend(attendEditCtx.empId);
+  if(!status && !note){ delete att[attendEditCtx.key]; }
+  else { att[attendEditCtx.key] = { status, note }; }
+  saveData();
+  document.getElementById('attendEditModal').classList.add('hidden');
+  renderMgrCalendar();
+});
+function openAttendView(rec, key, d, year, month){
+  document.getElementById('attendViewTitle').textContent = `${MONTH_NAMES[month]} ${d}, ${year}`;
+  document.getElementById('attendViewStatus').textContent = rec.status ? STATUS_LABEL[rec.status] : 'Not set';
+  document.getElementById('attendViewNote').textContent = rec.note || 'No note added.';
+  document.getElementById('attendViewModal').classList.remove('hidden');
+}
+document.getElementById('closeAttendView').addEventListener('click', ()=>{ document.getElementById('attendViewModal').classList.add('hidden'); });
+
+function defaultAttendRangeIfEmpty(){
+  const startEl = document.getElementById('attendRangeStart');
+  const endEl = document.getElementById('attendRangeEnd');
+  if(!startEl.value || !endEl.value){
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    startEl.value = dateKey(first.getFullYear(), first.getMonth(), 1);
+    endEl.value = todayStr();
+  }
+}
+document.getElementById('btnExportAttendance').addEventListener('click', ()=>{
+  const errEl = document.getElementById('attendExportError');
+  errEl.textContent = '';
+  if(typeof XLSX==='undefined'){ errEl.textContent = "Excel library not loaded."; return; }
+  const startRaw = document.getElementById('attendRangeStart').value;
+  const endRaw = document.getElementById('attendRangeEnd').value;
+  if(!startRaw || !endRaw){ errEl.textContent = "Please choose both a start and end date."; return; }
+  const startD = new Date(startRaw+"T00:00:00");
+  const endD = new Date(endRaw+"T00:00:00");
+  if(startD > endD){ errEl.textContent = "Start date must be before end date."; return; }
+
+  const rows = [];
+  data.employees.forEach(emp=>{
+    const att = data.attendance[emp.id] || {};
+    const cursor = new Date(startD);
+    while(cursor <= endD){
+      const key = dateKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      const rec = att[key] || {};
+      const day = (data.days[key] && data.days[key][emp.id]) || null;
+      const dowLabel = DOW_FULL[dowIndexMonFirst(cursor.getDay())];
+      rows.push({
+        Date: key, Day: dowLabel, Employee: emp.name, Username: emp.username,
+        Status: rec.status ? STATUS_LABEL[rec.status] : (day && day.login ? "Present" : ""),
+        "Manager note": rec.note || "",
+        "Login time": (day && day.login) || "", "Logout time": (day && day.logout) || "",
+        "Total count": day ? dayTotal(day) : ""
+      });
+      cursor.setDate(cursor.getDate()+1);
+    }
+  });
+  if(rows.length===0){ errEl.textContent = "No data in this range."; return; }
+  try{
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:12},{wch:11},{wch:18},{wch:14},{wch:10},{wch:32},{wch:11},{wch:11},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `attendance_${startRaw}_to_${endRaw}.xlsx`);
+  }catch(err){ errEl.textContent = "Export failed: " + err.message; }
+});
+
+/* ============================================================
+   ACCOUNT & ADMINS (each manager edits only their own login)
+   ============================================================ */
+function renderAccountSection(){
+  document.getElementById('curAdminUsername').textContent = session.username;
+  document.getElementById('acctNewUsername').value = '';
+  document.getElementById('acctNewPassword').value = '';
+  document.getElementById('acctCurrentPassword').value = '';
+  document.getElementById('acctError').textContent = '';
+  document.getElementById('acctSuccess').textContent = '';
+
+  const list = document.getElementById('adminList');
+  list.innerHTML = '';
+  data.managers.forEach(m=>{
+    const row = document.createElement('div');
+    row.className = 'admin-row';
+    const isYou = m.username === session.username;
+    row.innerHTML = `
+      <span>${esc(m.username)}${isYou?'<span class="you-badge">You</span>':''}</span>
+      ${!isYou && data.managers.length>1 ? `<button class="btn btn-sm btn-danger removeAdmin" data-u="${esc(m.username)}">Remove</button>` : (isYou ? '<span style="font-size:11.5px;color:var(--ink-soft);">Edit on the left</span>' : '<span style="font-size:11.5px;color:var(--ink-soft);">Only admin</span>')}
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.removeAdmin').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!confirm(`Remove admin access for "${btn.dataset.u}"?`)) return;
+      data.managers = data.managers.filter(m=>m.username!==btn.dataset.u);
+      saveData(); renderAccountSection();
+    });
+  });
+}
+document.getElementById('btnSaveAccount').addEventListener('click', ()=>{
+  const errEl = document.getElementById('acctError');
+  const okEl = document.getElementById('acctSuccess');
+  errEl.textContent = ''; okEl.textContent = '';
+  const me = data.managers.find(m=>m.username===session.username);
+  if(!me){ errEl.textContent = "Account not found."; return; }
+  const curPass = document.getElementById('acctCurrentPassword').value;
+  if(curPass !== me.password){ errEl.textContent = "Current password is incorrect."; return; }
+  const newU = document.getElementById('acctNewUsername').value.trim();
+  const newP = document.getElementById('acctNewPassword').value;
+  if(!newU && !newP){ errEl.textContent = "Enter a new username and/or new password to change."; return; }
+  if(newU && data.managers.find(m=>m.username!==me.username && m.username===newU)){ errEl.textContent = "That username is already taken by another admin."; return; }
+  if(newU) me.username = newU;
+  if(newP) me.password = newP;
+  session.username = me.username;
+  saveData();
+  okEl.textContent = "Saved. You're now signed in as " + me.username + ".";
+  document.getElementById('whoami').textContent="Signed in as "+session.username+" (Manager)";
+  renderAccountSection();
+});
+document.getElementById('btnAddAdmin').addEventListener('click', ()=>{
+  const errEl = document.getElementById('newAdminError');
+  errEl.textContent = '';
+  const u = document.getElementById('newAdminUsername').value.trim();
+  const p = document.getElementById('newAdminPassword').value;
+  if(!u || !p){ errEl.textContent = "Enter a username and password."; return; }
+  if(data.managers.find(m=>m.username===u)){ errEl.textContent = "That username is already in use."; return; }
+  data.managers.push({ username:u, password:p });
+  saveData();
+  document.getElementById('newAdminUsername').value='';
+  document.getElementById('newAdminPassword').value='';
+  renderAccountSection();
+});
+
+/* ============================================================
+   EMAIL NOTIFICATIONS (EmailJS REST API — no backend needed)
+   ============================================================ */
+function renderEmailConfigSection(){
+  document.getElementById('emailServiceId').value = data.emailConfig.serviceId || '';
+  document.getElementById('emailTemplateId').value = data.emailConfig.templateId || '';
+  document.getElementById('emailPublicKey').value = data.emailConfig.publicKey || '';
+  document.getElementById('emailConfigSaved').textContent = '';
+
+  const list = document.getElementById('notifyRecipientList');
+  list.innerHTML = '';
+  if(data.employees.length===0){ list.innerHTML = '<span style="font-size:12.5px;color:var(--ink-soft);">No employees yet.</span>'; return; }
+  const allLabel = document.createElement('label');
+  allLabel.innerHTML = `<input type="checkbox" id="notifyAll" /> <strong>All employees</strong>`;
+  list.appendChild(allLabel);
+  data.employees.forEach(emp=>{
+    const lab = document.createElement('label');
+    lab.innerHTML = `<input type="checkbox" class="notifyEmpChk" value="${emp.id}" /> ${esc(emp.name)}${emp.email?'':' <span style="color:var(--danger);font-size:11px;">(no email saved)</span>'}`;
+    list.appendChild(lab);
+  });
+  document.getElementById('notifyAll').addEventListener('change', e=>{
+    list.querySelectorAll('.notifyEmpChk').forEach(c=>c.checked = e.target.checked);
+  });
+}
+document.getElementById('btnSaveEmailConfig').addEventListener('click', ()=>{
+  data.emailConfig.serviceId = document.getElementById('emailServiceId').value.trim();
+  data.emailConfig.templateId = document.getElementById('emailTemplateId').value.trim();
+  data.emailConfig.publicKey = document.getElementById('emailPublicKey').value.trim();
+  saveData();
+  document.getElementById('emailConfigSaved').textContent = "Email settings saved.";
+});
+document.getElementById('btnSendNotify').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('notifyError');
+  const okEl = document.getElementById('notifySuccess');
+  errEl.textContent = ''; okEl.textContent = '';
+  const cfg = data.emailConfig;
+  if(!cfg.serviceId || !cfg.templateId || !cfg.publicKey){
+    errEl.textContent = "Please save your EmailJS Service ID, Template ID, and Public key above first.";
+    return;
+  }
+  const message = document.getElementById('notifyMessage').value.trim();
+  if(!message){ errEl.textContent = "Please type an update message."; return; }
+  const checked = Array.from(document.querySelectorAll('.notifyEmpChk:checked')).map(c=>c.value);
+  if(checked.length===0){ errEl.textContent = "Select at least one employee to notify."; return; }
+  const recipients = data.employees.filter(e=>checked.includes(e.id) && e.email);
+  const skipped = checked.length - recipients.length;
+  if(recipients.length===0){ errEl.textContent = "None of the selected employees have an email saved yet (add one in Employee accounts)."; return; }
+
+  const btn = document.getElementById('btnSendNotify');
+  btn.disabled = true; btn.textContent = "Sending…";
+  let sent = 0, failed = 0;
+  for(const emp of recipients){
+    try{
+      const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: cfg.serviceId,
+          template_id: cfg.templateId,
+          user_id: cfg.publicKey,
+          template_params: {
+            to_email: emp.email,
+            to_name: emp.name,
+            message: message,
+            from_name: "Workfloor"
+          }
+        })
+      });
+      if(res.ok) sent++; else failed++;
+    }catch(e){ failed++; }
+  }
+  btn.disabled = false; btn.textContent = "Send email update";
+  let summary = `Sent to ${sent} employee${sent===1?'':'s'}.`;
+  if(failed>0) summary += ` ${failed} failed.`;
+  if(skipped>0) summary += ` ${skipped} skipped (no email on file).`;
+  if(sent>0){ okEl.textContent = summary; document.getElementById('notifyMessage').value=''; }
+  else { errEl.textContent = summary + " Check your EmailJS settings and that your EmailJS account allows browser API calls."; }
+});
+
+/* ============================================================
+   MANAGER VIEW (overview, accounts, history, export)
+   ============================================================ */
+function renderManagerView(){
+  document.getElementById('mgrDate').textContent=new Date().toLocaleDateString([],{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const today=todayStr();
+  let presentCount=0,totalUnits=0,tasksDone=0,tasksTotal=0;
+
+  const tbody=document.querySelector('#mgrTable tbody');
+  tbody.innerHTML="";
+  data.employees.forEach(emp=>{
+    const day=ensureDay(emp.id,today);
+    if(day.login) presentCount++;
+    const total=dayTotal(day);
+    totalUnits+=total;
+    tasksDone+=day.tasks.filter(t=>t.done).length;
+    tasksTotal+=day.tasks.length;
+
+    let status,badgeClass;
+    if(!day.login){status="Absent";badgeClass="badge-absent";}
+    else if(day.logout){status="Done";badgeClass="badge-done";}
+    else{status="Active";badgeClass="badge-active";}
+
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><div class="name-cell"><div class="avatar">${initials(emp.name)}</div>${esc(emp.name)}</div></td>
+      <td>${day.login||"—"}</td>
+      <td>${day.logout||"—"}</td>
+      <td>${total}</td>
+      <td>${day.tasks.filter(t=>t.done).length} / ${day.tasks.length}</td>
+      <td><span class="badge ${badgeClass}">${status}</span></td>
+      <td><button class="btn btn-sm btn-danger removeEmp" data-emp="${emp.id}">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.removeEmp').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const empId=this.dataset.emp;
+      if(!confirm("Remove this employee? History is kept.")) return;
+      data.employees=data.employees.filter(e=>e.id!==empId);
+      saveData(); renderManagerView();
+    });
+  });
+
+  document.getElementById('statHeadcount').textContent=data.employees.length;
+  document.getElementById('statPresent').textContent=presentCount;
+  document.getElementById('statUnits').textContent=totalUnits;
+  document.getElementById('statTasks').textContent=`${tasksDone} / ${tasksTotal}`;
+
+  const taskAssignee=document.getElementById('taskAssignee');
+  taskAssignee.innerHTML="";
+  data.employees.forEach(emp=>{
+    const opt=document.createElement('option'); opt.value=emp.id; opt.textContent=emp.name; taskAssignee.appendChild(opt);
+  });
+
+  const subtaskAssignee=document.getElementById('subtaskAssignee');
+  subtaskAssignee.innerHTML="";
+  data.employees.forEach(emp=>{
+    const opt=document.createElement('option'); opt.value=emp.id; opt.textContent=emp.name; subtaskAssignee.appendChild(opt);
+  });
+  function refreshSubtaskParents(){
+    const empId=subtaskAssignee.value;
+    const parent=document.getElementById('subtaskParent');
+    parent.innerHTML='<option value="">— select task —</option>';
+    const today2=todayStr();
+    const day=data.days[today2]&&data.days[today2][empId];
+    if(day) day.tasks.filter(t=>!t.parentId).forEach(t=>{
+      const opt=document.createElement('option'); opt.value=t.id; opt.textContent=t.name; parent.appendChild(opt);
+    });
+  }
+  refreshSubtaskParents();
+  subtaskAssignee.addEventListener('change', refreshSubtaskParents);
+
+  const weekSel = document.getElementById('weekScheduleEmp');
+  const prevWeekSel = weekSel.value;
+  weekSel.innerHTML = '';
+  data.employees.forEach(emp=>{
+    const opt=document.createElement('option'); opt.value=emp.id; opt.textContent=emp.name; weekSel.appendChild(opt);
+  });
+  if(prevWeekSel && data.employees.find(e=>e.id===prevWeekSel)) weekSel.value = prevWeekSel;
+
+  const calSel = document.getElementById('mgrCalEmp');
+  const prevCalSel = calSel.value;
+  calSel.innerHTML = '';
+  data.employees.forEach(emp=>{
+    const opt=document.createElement('option'); opt.value=emp.id; opt.textContent=emp.name; calSel.appendChild(opt);
+  });
+  if(prevCalSel && data.employees.find(e=>e.id===prevCalSel)) calSel.value = prevCalSel;
+
+  renderCredsTable();
+  renderHistory();
+  renderMgrDocuments();
+  renderMgrGuides();
+  renderMgrWeekSchedule();
+  renderMgrCalendar();
+  defaultAttendRangeIfEmpty();
+  renderAccountSection();
+  renderEmailConfigSection();
+  initSheetsUI();
+}
+
+function renderCredsTable(){
+  const tbody=document.querySelector('#credsTable tbody');
+  tbody.innerHTML="";
+  data.employees.forEach(emp=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><div class="name-cell"><div class="avatar">${initials(emp.name)}</div>${esc(emp.name)}</div></td>
+      <td><input type="text" class="credUsername" data-emp="${emp.id}" value="${esc(emp.username)}" /></td>
+      <td><input type="text" class="credPassword" data-emp="${emp.id}" value="${esc(emp.password)}" /></td>
+      <td><input type="email" class="credEmail" data-emp="${emp.id}" value="${esc(emp.email||'')}" placeholder="employee@email.com" style="min-width:170px;" /></td>
+      <td><button class="btn btn-sm saveCred" data-emp="${emp.id}">Save</button></td>
+      <td><button class="btn btn-sm btn-danger delCred" data-emp="${emp.id}">Delete</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.saveCred').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      const empId=e.target.dataset.emp;
+      const emp=data.employees.find(em=>em.id===empId);
+      const row=e.target.closest('tr');
+      const nu=row.querySelector('.credUsername').value.trim();
+      const np=row.querySelector('.credPassword').value;
+      const ne=row.querySelector('.credEmail').value.trim();
+      if(!nu||!np){ alert("Username and password cannot be empty."); return; }
+      if(data.employees.find(em=>em.id!==empId&&em.username===nu)){ alert("Username taken."); return; }
+      emp.username=nu; emp.password=np; emp.email=ne; saveData();
+      alert("Details updated for "+emp.name);
+      renderEmailConfigSection();
+    });
+  });
+  tbody.querySelectorAll('.delCred').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const empId=this.dataset.emp;
+      const emp=data.employees.find(em=>em.id===empId);
+      if(!confirm("Delete "+emp.name+"? History kept.")) return;
+      data.employees=data.employees.filter(em=>em.id!==empId);
+      saveData(); renderManagerView();
+    });
+  });
+}
+
+function renderHistory(){
+  const tbody=document.querySelector('#historyTable tbody');
+  tbody.innerHTML="";
+  const dates=Object.keys(data.days).sort().reverse();
+  dates.forEach(date=>{
+    data.employees.forEach(emp=>{
+      const day=data.days[date]&&data.days[date][emp.id];
+      if(!day) return;
+      if(!day.login&&!day.logout&&day.tasks.length===0) return;
+      const breakdown=day.tasks.map(t=>{
+        const dur=t.duration!==null&&t.duration!==undefined?minutesToHM(t.duration):"—";
+        return `${t.name}: ${t.count||0} | ${t.startTime||"—"}→${t.endTime||"—"} (${dur})`;
+      }).join(" / ");
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td>${date}</td>
+        <td>${esc(emp.name)}</td>
+        <td>${day.login||"—"}</td>
+        <td>${day.logout||"—"}</td>
+        <td>${dayTotal(day)}</td>
+        <td style="white-space:normal;min-width:300px;">${breakdown||"—"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+document.getElementById('btnAddEmployee').addEventListener('click',()=>{
+  ['newEmpName','newEmpUsername','newEmpPassword','newEmpEmail'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('addEmpError').textContent='';
+  document.getElementById('addEmpModal').classList.remove('hidden');
+});
+document.getElementById('cancelAddEmp').addEventListener('click',()=>document.getElementById('addEmpModal').classList.add('hidden'));
+document.getElementById('confirmAddEmp').addEventListener('click',()=>{
+  const name=document.getElementById('newEmpName').value.trim();
+  const username=document.getElementById('newEmpUsername').value.trim();
+  const password=document.getElementById('newEmpPassword').value;
+  const email=document.getElementById('newEmpEmail').value.trim();
+  const errEl=document.getElementById('addEmpError');
+  if(!name||!username||!password){ errEl.textContent="Fill in name, username and password."; return; }
+  if(data.employees.find(e=>e.username===username)){ errEl.textContent="Username already taken."; return; }
+  data.employees.push({id:"e"+Date.now(),name,username,password,email});
+  saveData(); document.getElementById('addEmpModal').classList.add('hidden'); renderManagerView();
+});
+
+document.getElementById('btnAssignSubtask').addEventListener('click',()=>{
+  const empId=document.getElementById('subtaskAssignee').value;
+  const parentId=document.getElementById('subtaskParent').value;
+  const name=document.getElementById('newSubtaskName').value.trim();
+  if(!empId||!parentId||!name){ alert("Please select an employee, a parent task, and enter a subtask name."); return; }
+  const day=ensureDay(empId,todayStr());
+  const parent=day.tasks.find(t=>t.id===parentId);
+  if(!parent){ alert("Parent task not found."); return; }
+  day.tasks.push({id:"t"+Date.now(),name,done:false,count:0,startTime:null,endTime:null,duration:null,parentId});
+  saveData(); document.getElementById('newSubtaskName').value=''; renderManagerView();
+});
+
+/* ============================================================
+   GOOGLE SHEETS SYNC
+   ============================================================ */
+/* ============================================================
+   BAKED-IN CONFIG — edit this section, then re-upload the file
+   ============================================================ */
+const BAKED_SHEETS_URL = '';  // ← PASTE YOUR APPS SCRIPT URL HERE
+
+const SHEETS_URL_KEY = 'workfloor_sheets_url';
+const SHEETS_INTERVAL_KEY = 'workfloor_sheets_interval';
+const SHEETS_LAST_SYNC_KEY = 'workfloor_sheets_last_sync';
+let autoSyncTimer = null;
+
+// Baked-in URL takes priority over localStorage so every device
+// automatically uses the same Google Sheet with zero setup.
+function getSheetsUrl(){
+  if(BAKED_SHEETS_URL && BAKED_SHEETS_URL.startsWith('https://')) return BAKED_SHEETS_URL;
+  return localStorage.getItem(SHEETS_URL_KEY)||'';
+}
+function saveSheetsUrl(url){ localStorage.setItem(SHEETS_URL_KEY, url); }
+
+function initSheetsUI(){
+  const url = getSheetsUrl();
+  const setupPanel = document.getElementById('sheetsSetupPanel');
+  const syncPanel = document.getElementById('sheetsSyncPanel');
+  const statusEl = document.getElementById('sheetsSyncStatus');
+  const syncBtn = document.getElementById('btnSyncNow');
+  const isBaked = BAKED_SHEETS_URL && BAKED_SHEETS_URL.startsWith('https://');
+  if(url){
+    setupPanel.classList.add('hidden');
+    syncPanel.classList.remove('hidden');
+    statusEl.classList.remove('hidden');
+    statusEl.style.background='var(--accent-soft)';
+    statusEl.style.color='var(--accent-deep)';
+    statusEl.textContent='● Sheets connected';
+    syncBtn.style.display='inline-flex';
+    const lastSync = localStorage.getItem(SHEETS_LAST_SYNC_KEY);
+    document.getElementById('lastSyncTime').textContent = lastSync||'Never';
+    const savedInterval = localStorage.getItem(SHEETS_INTERVAL_KEY)||'300';
+    document.getElementById('autoSyncInterval').value = savedInterval;
+    startAutoSync(parseInt(savedInterval));
+    // If URL is baked in, hide the disconnect button — employees shouldn't be able to break it
+    if(isBaked){
+      const disconnectBtn = document.getElementById('btnDisconnectSheet');
+      if(disconnectBtn) disconnectBtn.style.display = 'none';
+      const connLabel = document.getElementById('sheetsConnectedLabel');
+      if(connLabel) connLabel.textContent = '✓ Auto-connected to Google Sheets';
+    }
+  } else {
+    setupPanel.classList.remove('hidden');
+    syncPanel.classList.add('hidden');
+    statusEl.classList.add('hidden');
+    syncBtn.style.display='none';
+  }
+}
+
+function startAutoSync(seconds){
+  if(autoSyncTimer){ clearInterval(autoSyncTimer); autoSyncTimer=null; }
+  if(seconds>0){
+    autoSyncTimer = setInterval(()=>{ if(getSheetsUrl()) doSync(true); }, seconds*1000);
+  }
+}
+
+async function doSync(silent){
+  const url = getSheetsUrl();
+  if(!url) return;
+  const errEl = document.getElementById('syncError');
+  const successEl = document.getElementById('syncSuccess');
+  const statusEl = document.getElementById('sheetsSyncStatus');
+  if(!silent){ errEl.textContent=''; successEl.textContent='Syncing…'; }
+  statusEl.style.background='var(--warn-soft)'; statusEl.style.color='var(--warn)'; statusEl.textContent='↑ Syncing…';
+  try {
+    const payload = {
+      action: 'syncAll',
+      employees: data.employees.map(e=>({id:e.id,name:e.name,username:e.username,email:e.email||''})),
+      days: data.days,
+      attendance: data.attendance||{}
+    };
+    // Use GET with URL params — avoids CORS preflight that blocks POST to Apps Script
+    const params = new URLSearchParams({
+      action: 'syncAll',
+      data: JSON.stringify(payload)
+    });
+    const res = await fetch(url + '?' + params.toString(), {
+      method: 'GET',
+      redirect: 'follow'
+    });
+    const json = await res.json();
+    if(json.ok){
+      const ts = new Date().toLocaleString();
+      localStorage.setItem(SHEETS_LAST_SYNC_KEY, ts);
+      document.getElementById('lastSyncTime').textContent = ts;
+      statusEl.style.background='var(--accent-soft)'; statusEl.style.color='var(--accent-deep)'; statusEl.textContent='✓ Sheets synced';
+      if(!silent){ successEl.textContent='✓ Synced at '+ts; errEl.textContent=''; }
+    } else {
+      throw new Error(json.error||'Sync failed');
+    }
+  } catch(err){
+    statusEl.style.background='var(--danger-soft)'; statusEl.style.color='var(--danger)'; statusEl.textContent='⚠ Sync error';
+    if(!silent){ errEl.textContent='Error: '+err.message+'. Make sure the Web App is deployed with "Anyone" access.'; successEl.textContent=''; }
+  }
+}
+
+// Store Apps Script code as a JS string to avoid HTML entity corruption when copying
+const APPS_SCRIPT_CODE = [
+'const SHEET_NAME = "Daily Records";',
+'const ATTENDANCE_SHEET = "Attendance";',
+'const EMPLOYEES_SHEET = "Employees";',
+'',
+'// IMPORTANT: This script uses doGet only (not doPost)',
+'function doGet(e) {',
+'  try {',
+'    const action = e.parameter.action;',
+'    if (action === "ping") {',
+'      return jsonResponse({ok: true, status: "Workfloor bridge ready"});',
+'    }',
+'    if (action === "syncAll") {',
+'      const payload = JSON.parse(decodeURIComponent(e.parameter.data));',
+'      const ss = SpreadsheetApp.getActiveSpreadsheet();',
+'      syncDailyRecords(ss, payload.days, payload.employees);',
+'      syncAttendance(ss, payload.attendance, payload.employees);',
+'      syncEmployees(ss, payload.employees);',
+'      return jsonResponse({ok: true, message: "Synced " + new Date().toLocaleString()});',
+'    }',
+'    return jsonResponse({ok: false, error: "Unknown action: " + action});',
+'  } catch(err) {',
+'    return jsonResponse({ok: false, error: err.toString()});',
+'  }',
+'}',
+'',
+'function jsonResponse(obj) {',
+'  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);',
+'}',
+'',
+'function syncDailyRecords(ss, days, employees) {',
+'  var sheet = ss.getSheetByName(SHEET_NAME);',
+'  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);',
+'  sheet.clearContents();',
+'  var headers = ["Date","Employee","Login","Logout","Total Count","Task Type","Parent Task","Task","Task Start","Task End","Duration (min)","Duration","Count","Done"];',
+'  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");',
+'  var rows = [];',
+'  Object.keys(days).sort().forEach(function(date) {',
+'    employees.forEach(function(emp) {',
+'      var day = days[date] && days[date][emp.id];',
+'      if (!day) return;',
+'      var total = day.tasks.filter(function(t){ return !t.parentId; }).reduce(function(s,t){ return s + (parseInt(t.count) || 0); }, 0);',
+'      if (day.tasks.length === 0) {',
+'        rows.push([date,emp.name,day.login||"",day.logout||"",total,"","","","","","","","",""]);',
+'      } else {',
+'        day.tasks.forEach(function(t) {',
+'          var durMin = t.duration != null ? t.duration : "";',
+'          var durHM = t.duration != null ? Math.floor(t.duration/60)+"h "+(t.duration%60)+"m" : "";',
+'          var isSub = !!t.parentId;',
+'          var parent = isSub ? day.tasks.filter(function(p){ return p.id === t.parentId; })[0] : null;',
+'          var parentName = parent ? parent.name : "";',
+'          var taskLabel = isSub ? ("-> " + t.name) : t.name;',
+'          rows.push([date,emp.name,day.login||"",day.logout||"",total,isSub?"Subtask":"Task",parentName,taskLabel,t.startTime||"",t.endTime||"",durMin,durHM,t.count||0,t.done?"Yes":"No"]);',
+'        });',
+'      }',
+'    });',
+'  });',
+'  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);',
+'  autoResize(sheet, headers.length);',
+'}',
+'',
+'function syncAttendance(ss, attendance, employees) {',
+'  var sheet = ss.getSheetByName(ATTENDANCE_SHEET);',
+'  if (!sheet) sheet = ss.insertSheet(ATTENDANCE_SHEET);',
+'  sheet.clearContents();',
+'  var headers = ["Date","Employee","Status","Note"];',
+'  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");',
+'  var rows = [];',
+'  employees.forEach(function(emp) {',
+'    var empAtt = (attendance && attendance[emp.id]) || {};',
+'    Object.keys(empAtt).sort().forEach(function(date) {',
+'      var rec = empAtt[date];',
+'      if (!rec || !rec.status) return;',
+'      rows.push([date, emp.name, rec.status||"", rec.note||""]);',
+'    });',
+'  });',
+'  rows.sort(function(a,b){ return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });',
+'  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);',
+'  autoResize(sheet, headers.length);',
+'}',
+'',
+'function syncEmployees(ss, employees) {',
+'  var sheet = ss.getSheetByName(EMPLOYEES_SHEET);',
+'  if (!sheet) sheet = ss.insertSheet(EMPLOYEES_SHEET);',
+'  sheet.clearContents();',
+'  var headers = ["ID","Name","Username","Email"];',
+'  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight("bold");',
+'  var rows = employees.map(function(e){ return [e.id, e.name, e.username, e.email||""]; });',
+'  if (rows.length) sheet.getRange(2,1,rows.length,headers.length).setValues(rows);',
+'  autoResize(sheet, headers.length);',
+'}',
+'',
+'function autoResize(sheet, numCols) {',
+'  for (var i = 1; i <= numCols; i++) sheet.autoResizeColumn(i);',
+'}'
+].join('\n');
+
+// Render the script into the pre tag
+(function(){
+  var pre = document.getElementById('appsScriptCode');
+  if(pre) pre.textContent = APPS_SCRIPT_CODE;
+})();
+
+document.getElementById('btnCopyScript').addEventListener('click',()=>{
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>{
+    const btn = document.getElementById('btnCopyScript');
+    btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy script',2000);
+  });
+});
+
+document.getElementById('btnTestSheet').addEventListener('click', async()=>{
+  const url = document.getElementById('sheetsWebAppUrl').value.trim();
+  const errEl = document.getElementById('sheetsUrlError');
+  const successEl = document.getElementById('sheetsUrlSuccess');
+  errEl.textContent=''; successEl.textContent='Testing…';
+  if(!url){ errEl.textContent='Please paste your Web App URL first.'; successEl.textContent=''; return; }
+  try {
+    const res = await fetch(url + '?action=ping', { method: 'GET', redirect: 'follow' });
+    const json = await res.json();
+    if(json.ok){ successEl.textContent='✓ Connection successful! Now click "Save & enable sync".'; errEl.textContent=''; }
+    else { throw new Error(json.error||'Unexpected response'); }
+  } catch(err){
+    errEl.textContent='Connection failed: '+err.message+'. Double-check the URL and make sure access is set to "Anyone".';
+    successEl.textContent='';
+  }
+});
+
+document.getElementById('btnSaveSheetUrl').addEventListener('click',()=>{
+  const url = document.getElementById('sheetsWebAppUrl').value.trim();
+  const errEl = document.getElementById('sheetsUrlError');
+  if(!url){ errEl.textContent='Please paste a Web App URL.'; return; }
+  if(!url.startsWith('https://script.google.com')){ errEl.textContent='This doesn\'t look like a Google Apps Script URL.'; return; }
+  saveSheetsUrl(url);
+  initSheetsUI();
+  doSync(false);
+});
+
+document.getElementById('btnDisconnectSheet').addEventListener('click',()=>{
+  if(!confirm('Disconnect Google Sheets? Your local data won\'t be affected.')) return;
+  localStorage.removeItem(SHEETS_URL_KEY);
+  localStorage.removeItem(SHEETS_LAST_SYNC_KEY);
+  if(autoSyncTimer){ clearInterval(autoSyncTimer); autoSyncTimer=null; }
+  document.getElementById('sheetsWebAppUrl').value='';
+  initSheetsUI();
+});
+
+document.getElementById('btnManualSync').addEventListener('click',()=>doSync(false));
+document.getElementById('btnSyncNow').addEventListener('click',()=>doSync(false));
+
+document.getElementById('autoSyncInterval').addEventListener('change', e=>{
+  const val = parseInt(e.target.value);
+  localStorage.setItem(SHEETS_INTERVAL_KEY, val);
+  startAutoSync(val);
+});
+
+// Override saveData to also show unsaved indicator
+function saveData(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  const statusEl = document.getElementById('sheetsSyncStatus');
+  if(getSheetsUrl() && statusEl && !statusEl.classList.contains('hidden')){
+    if(!statusEl.textContent.includes('Syncing')){
+      statusEl.style.background='var(--warn-soft)'; statusEl.style.color='var(--warn)';
+      statusEl.textContent='● Unsaved to Sheets';
+    }
+  }
+}
+
+document.getElementById('btnAssignTask').addEventListener('click',()=>{
+  const empId=document.getElementById('taskAssignee').value;
+  const name=document.getElementById('newTaskName').value.trim();
+  if(!empId||!name) return;
+  const day=ensureDay(empId,todayStr());
+  day.tasks.push({id:"t"+Date.now(),name,done:false,count:0,startTime:null,endTime:null,duration:null});
+  saveData(); document.getElementById('newTaskName').value=''; renderManagerView();
+});
+
+document.getElementById('btnExport').addEventListener('click',()=>{
+  if(typeof XLSX==='undefined'){ alert("Excel library not loaded."); return; }
+  const rows=[];
+  Object.keys(data.days).sort().forEach(date=>{
+    data.employees.forEach(emp=>{
+      const day=data.days[date]&&data.days[date][emp.id];
+      if(!day) return;
+      day.tasks.forEach(task=>{
+        const isSub = !!task.parentId;
+        const parentName = isSub ? (day.tasks.find(t=>t.id===task.parentId)||{}).name || "" : "";
+        rows.push({
+          Date:date, Employee:emp.name, Username:emp.username,
+          "Login":day.login||"", "Logout":day.logout||"",
+          "Task type": isSub ? "Subtask" : "Task",
+          "Parent task": parentName,
+          "Task": isSub ? "↳ "+task.name : task.name,
+          "Task start":task.startTime||"", "Task end":task.endTime||"",
+          "Duration (min)":task.duration!==null&&task.duration!==undefined?task.duration:"",
+          "Duration (hm)":task.duration!==null&&task.duration!==undefined?minutesToHM(task.duration):"",
+          "Count":task.count||0, "Done":task.done?"Yes":"No",
+          "Day total count (tasks only)":dayTotal(day)
+        });
+      });
+      if(day.tasks.length===0){
+        rows.push({Date:date,Employee:emp.name,Username:emp.username,"Login":day.login||"","Logout":day.logout||"","Task type":"","Parent task":"","Task":"","Task start":"","Task end":"","Duration (min)":"","Duration (hm)":"","Count":"","Done":"","Day total count (tasks only)":0});
+      }
+    });
+  });
+  if(rows.length===0){ alert("No data to export."); return; }
+  try{
+    const ws=XLSX.utils.json_to_sheet(rows);
+    ws['!cols']=[{wch:12},{wch:18},{wch:14},{wch:10},{wch:10},{wch:9},{wch:18},{wch:24},{wch:11},{wch:11},{wch:14},{wch:13},{wch:8},{wch:6},{wch:22}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Daily records");
+    XLSX.writeFile(wb,`workfloor_report_${todayStr()}.xlsx`);
+  }catch(err){ alert("Export failed: "+err.message); }
+});
+
+// ============================================
+// 🚀 REAL-TIME FIREBASE FIRESTORE SYNC
+// ============================================
+const FIREBASE_PROJECT = "ixora-employee";
+const FIRESTORE_API_KEY = "AIzaSyBdgdaxS_y1FcLAP8NppkjcSmlUHmG9E4A";
+let firebasePollingInterval = null;
+let lastFirebaseSyncTime = 0;
+
+console.log('✓ Firebase Real-Time Sync Module Loaded');
+
+// WRITE to Firebase (called whenever saveData() is triggered)
+async function syncToFirebase(){
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/workfloor/main?key=${FIRESTORE_API_KEY}`;
+    
+    const doc = {
+      fields: {
+        employees: { arrayValue: { values: data.employees.map(e => ({
+          mapValue: { fields: {
+            id: { stringValue: e.id },
+            name: { stringValue: e.name },
+            username: { stringValue: e.username },
+            password: { stringValue: e.password },
+            email: { stringValue: e.email || "" }
+          }}
+        })) } },
+        days: { stringValue: JSON.stringify(data.days) },
+        attendance: { stringValue: JSON.stringify(data.attendance || {}) },
+        lastUpdated: { timestampValue: new Date().toISOString() },
+        syncTime: { integerValue: Date.now().toString() }
+      }
+    };
+    
+    await fetch(url, {
+      method: 'PATCH',
+      body: JSON.stringify(doc),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    console.log('✓ Synced to Firebase');
+  } catch (err) {
+    console.log('Firebase write (non-critical):', err.message);
+  }
+}
+
+// READ from Firebase (polls every 5 seconds)
+async function readFromFirebase(){
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/workfloor/main?key=${FIRESTORE_API_KEY}`;
+    
+    const response = await fetch(url);
+    const doc = await response.json();
+    
+    if (!doc.fields) return;
+    
+    const firestoreSyncTime = parseInt(doc.fields.syncTime?.integerValue || 0);
+    
+    // Only update if Firebase has newer data
+    if (firestoreSyncTime > lastFirebaseSyncTime) {
+      lastFirebaseSyncTime = firestoreSyncTime;
+      
+      // Parse Firebase data
+      const firebaseEmployees = doc.fields.employees?.arrayValue?.values?.map(e => ({
+        id: e.mapValue.fields.id.stringValue,
+        name: e.mapValue.fields.name.stringValue,
+        username: e.mapValue.fields.username.stringValue,
+        password: e.mapValue.fields.password.stringValue,
+        email: e.mapValue.fields.email?.stringValue || ""
+      })) || [];
+      
+      const firebaseDays = JSON.parse(doc.fields.days?.stringValue || '{}');
+      const firebaseAttendance = JSON.parse(doc.fields.attendance?.stringValue || '{}');
+      
+      // Merge: Firebase is source of truth
+      data.employees = firebaseEmployees;
+      data.days = firebaseDays;
+      data.attendance = firebaseAttendance;
+      
+      // Save locally
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      
+      // Refresh UI if logged in
+      if (session) {
+        console.log('📊 Real-time update from Firebase');
+        if (session.role === 'manager') renderManagerView();
+        else if (session.role === 'employee') renderEmployeeView();
+      }
+    }
+  } catch (err) {
+    console.log('Firebase read (will retry):', err.message);
+  }
+}
+
+// Start polling
+function startFirebaseSync(){
+  console.log('🔄 Starting Firebase real-time sync...');
+  readFromFirebase();
+  firebasePollingInterval = setInterval(() => {
+    readFromFirebase();
+  }, 5000);
+}
+
+// Stop polling
+function stopFirebaseSync(){
+  if (firebasePollingInterval) {
+    clearInterval(firebasePollingInterval);
+    firebasePollingInterval = null;
+    console.log('⏹️ Firebase sync stopped');
+  }
+}
+
+// Wrap saveData to include Firebase sync
+const _originalSaveData = saveData;
+saveData = function(){
+  _originalSaveData();
+  syncToFirebase();
+};
+
+// Start Firebase when entering app
+const _originalEnterApp = enterApp;
+enterApp = function(){
+  _originalEnterApp();
+  startFirebaseSync();
+};
+
+// Stop Firebase on logout
+document.getElementById('btnLogoutApp').addEventListener('click', () => {
+  stopFirebaseSync();
+});
+
+console.log('✅ Real-Time Firebase Module Active');
+
+</script>
+</body>
+</html>
